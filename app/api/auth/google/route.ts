@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGoogleOAuthClient } from "@/lib/google";
+import { getGoogleOAuthClient } from "../../../../lib/google";
 
 export async function GET() {
   const oauth2Client = getGoogleOAuthClient();
