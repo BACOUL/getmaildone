@@ -1,729 +1,471 @@
-Parfait.
-👉 Donc on adapte la checklist à Next.js + Vercel.
+# GETMAILDONE — CHECKLIST EXACTE DE A À Z
 
-Et surtout, si on continue vers du code après, il faudra rester compatible Vercel dès le départ.
-
-
----
-
-✅ CHECKLIST A À Z — GETMAILDONE (NEXT.JS + VERCEL)
-
-1. Base projet
-
-[ ] Créer le projet Next.js
-
-[ ] Push sur GitHub
-
-[ ] Connecter le repo à Vercel
-
-[ ] Vérifier qu’un deploy vide fonctionne
-
-[ ] Ajouter un .env.local
-
-[ ] Ajouter les variables aussi dans Vercel
-
-
+## 0. Vision produit
+- [ ] Définir le scope MVP exact :
+  - [ ] Gmail uniquement
+  - [ ] Emails uniquement
+  - [ ] Réponses simples uniquement
+  - [ ] Validation humaine obligatoire
+- [ ] Définir la promesse produit :
+  - [ ] “Stop writing emails. Just get them done.”
+- [ ] Définir le nom produit :
+  - [ ] GetMailDone
+- [ ] Définir la tagline :
+  - [ ] “We prepare replies. You just send.”
 
 ---
 
-2. Domaine et branding minimal
-
-[ ] Acheter / connecter getmaildone.com
-
-[ ] Définir le nom produit : GetMailDone
-
-[ ] Définir la tagline principale
-
-[ ] Définir une phrase de sous-titre claire
-
-[ ] Préparer un logo texte simple provisoire
-
-
+## 1. Base projet
+- [ ] Créer le repo GitHub
+- [ ] Initialiser le projet Next.js
+- [ ] Choisir App Router
+- [ ] Configurer TypeScript
+- [ ] Configurer ESLint
+- [ ] Configurer Prettier si besoin
+- [ ] Push sur GitHub
+- [ ] Connecter le repo à Vercel
+- [ ] Vérifier qu’un premier deploy vide fonctionne
 
 ---
 
-3. Architecture technique minimale
-
-[ ] Choisir App Router Next.js
-
-[ ] Créer structure propre :
-
-[ ] app/
-
-[ ] components/
-
-[ ] lib/
-
-[ ] types/
-
-
-[ ] Prévoir pages :
-
-[ ] /
-
-[ ] /dashboard
-
-[ ] /api/auth/google
-
-[ ] /api/auth/callback/google
-
-[ ] /api/emails
-
-[ ] /api/reply
-
-[ ] /api/send
-
-
-
+## 2. Domaine et branding
+- [ ] Connecter le domaine à Vercel
+- [ ] Configurer le domaine principal
+- [ ] Configurer redirection www / non-www
+- [ ] Ajouter favicon temporaire
+- [ ] Ajouter titre HTML / metadata de base
+- [ ] Ajouter logo texte provisoire
+- [ ] Créer une identité minimale :
+  - [ ] nom
+  - [ ] tagline
+  - [ ] couleurs simples
+  - [ ] typographie propre
 
 ---
 
-4. Google Cloud / Gmail API
-
-[ ] Créer un projet Google Cloud
-
-[ ] Activer Gmail API
-
-[ ] Configurer l’écran de consentement OAuth
-
-[ ] Créer OAuth Client ID
-
-[ ] Ajouter les redirect URIs :
-
-[ ] local
-
-[ ] prod Vercel
-
-
-[ ] Récupérer :
-
-[ ] GOOGLE_CLIENT_ID
-
-[ ] GOOGLE_CLIENT_SECRET
-
-
-
+## 3. Structure du repo
+- [ ] Créer la structure suivante :
+  - [ ] `app/`
+  - [ ] `components/`
+  - [ ] `lib/`
+  - [ ] `types/`
+  - [ ] `styles/` si nécessaire
+- [ ] Créer les pages initiales :
+  - [ ] `/`
+  - [ ] `/dashboard`
+  - [ ] `/api/auth/google`
+  - [ ] `/api/auth/callback/google`
+  - [ ] `/api/emails`
+  - [ ] `/api/reply`
+  - [ ] `/api/send`
+- [ ] Créer les fichiers de config utiles :
+  - [ ] `.env.local`
+  - [ ] `.gitignore`
+  - [ ] `README.md`
 
 ---
 
-5. Auth Gmail
-
-[ ] Ajouter bouton “Connect Gmail”
-
-[ ] Rediriger vers OAuth Google
-
-[ ] Gérer callback OAuth
-
-[ ] Récupérer :
-
-[ ] access token
-
-[ ] refresh token
-
-
-[ ] Stocker la session utilisateur
-
-[ ] Vérifier que l’utilisateur connecté peut accéder au dashboard
-
-
+## 4. Variables d’environnement
+- [ ] Définir les variables locales
+- [ ] Définir les variables Vercel
+- [ ] Ajouter au minimum :
+  - [ ] `GOOGLE_CLIENT_ID`
+  - [ ] `GOOGLE_CLIENT_SECRET`
+  - [ ] `GOOGLE_REDIRECT_URI`
+  - [ ] `OPENAI_API_KEY` ou autre provider
+  - [ ] `DATABASE_URL`
+  - [ ] `NEXTAUTH_SECRET` si auth lib
+  - [ ] `NEXT_PUBLIC_APP_URL`
 
 ---
 
-6. Choix stockage
-
-Comme tu es sur Vercel, il faut éviter les bricolages temporaires qui cassent vite.
-
-[ ] Choisir une base :
-
-[ ] Supabase
-
-[ ] ou Postgres Vercel
-
-
-[ ] Créer les tables minimales
-
-[ ] Stocker :
-
-[ ] user
-
-[ ] tokens Gmail
-
-[ ] emails importés
-
-[ ] réponses générées
-
-[ ] actions utilisateur
-
-
-
+## 5. Google Cloud / Gmail API
+- [ ] Créer un projet Google Cloud
+- [ ] Activer Gmail API
+- [ ] Configurer l’écran de consentement OAuth
+- [ ] Ajouter les domaines autorisés
+- [ ] Créer un OAuth Client ID
+- [ ] Ajouter les redirect URIs :
+  - [ ] local
+  - [ ] production Vercel
+- [ ] Vérifier les scopes nécessaires :
+  - [ ] lecture email
+  - [ ] lecture sent
+  - [ ] envoi email
+- [ ] Tester manuellement l’auth Google
 
 ---
 
-7. Schéma minimal de données
-
-[ ] users
-
-[ ] id
-
-[ ] email
-
-[ ] name
-
-
-[ ] gmail_accounts
-
-[ ] user_id
-
-[ ] access_token
-
-[ ] refresh_token
-
-[ ] expiry_date
-
-
-[ ] emails
-
-[ ] id
-
-[ ] user_id
-
-[ ] gmail_message_id
-
-[ ] from_email
-
-[ ] subject
-
-[ ] body
-
-[ ] category
-
-
-[ ] suggested_replies
-
-[ ] id
-
-[ ] email_id
-
-[ ] generated_reply
-
-[ ] edited_reply
-
-[ ] action (sent, edited, ignored, pending)
-
-
-
+## 6. Auth utilisateur
+- [ ] Ajouter le bouton “Connect Gmail”
+- [ ] Implémenter la redirection OAuth Google
+- [ ] Gérer le callback OAuth
+- [ ] Récupérer :
+  - [ ] access token
+  - [ ] refresh token
+  - [ ] user info
+- [ ] Stocker la session utilisateur
+- [ ] Protéger l’accès au dashboard
+- [ ] Gérer état connecté / non connecté
 
 ---
 
-8. Récupération des emails
-
-[ ] Utiliser Gmail API messages.list
-
-[ ] Récupérer les derniers emails
-
-[ ] Utiliser messages.get pour le détail
-
-[ ] Parser :
-
-[ ] sujet
-
-[ ] expéditeur
-
-[ ] contenu texte
-
-
-[ ] Nettoyer :
-
-[ ] signatures
-
-[ ] HTML inutile
-
-[ ] bruit
-
-
-
+## 7. Base de données
+- [ ] Choisir la base :
+  - [ ] Supabase
+  - [ ] ou Postgres Vercel
+- [ ] Créer les tables minimales :
+  - [ ] users
+  - [ ] gmail_accounts
+  - [ ] emails
+  - [ ] suggested_replies
+  - [ ] style_profiles
+- [ ] Tester la connexion DB
+- [ ] Créer la couche d’accès DB dans `lib/`
 
 ---
 
-9. Affichage dashboard
-
-[ ] Créer page /dashboard
-
-[ ] Afficher liste des emails
-
-[ ] Afficher :
-
-[ ] From
-
-[ ] Subject
-
-[ ] Body
-
-
-[ ] Design simple, lisible, propre
-
-[ ] Prévoir état loading
-
-[ ] Prévoir état vide
-
-
-
----
-
-10. Première logique de tri
-
-Avant même de répondre, le système doit savoir quoi faire.
-
-[ ] Créer 4 catégories :
-
-[ ] IGNORE
-
-[ ] READ_ONLY
-
-[ ] REPLY_SIMPLE
-
-[ ] REPLY_COMPLEX
-
-
-[ ] Ajouter filtre simple :
-
-[ ] no-reply
-
-[ ] unsubscribe
-
-[ ] newsletters évidentes
-
-
-[ ] Ajouter appel LLM pour classifier les cas non évidents
-
-
+## 8. Schéma de données
+- [ ] Table `users`
+  - [ ] id
+  - [ ] email
+  - [ ] name
+  - [ ] created_at
+- [ ] Table `gmail_accounts`
+  - [ ] id
+  - [ ] user_id
+  - [ ] access_token
+  - [ ] refresh_token
+  - [ ] token_expiry
+  - [ ] created_at
+- [ ] Table `emails`
+  - [ ] id
+  - [ ] user_id
+  - [ ] gmail_message_id
+  - [ ] gmail_thread_id
+  - [ ] from_email
+  - [ ] from_name
+  - [ ] subject
+  - [ ] body
+  - [ ] category
+  - [ ] created_at
+- [ ] Table `suggested_replies`
+  - [ ] id
+  - [ ] email_id
+  - [ ] generated_reply
+  - [ ] edited_reply
+  - [ ] action
+  - [ ] created_at
+- [ ] Table `style_profiles`
+  - [ ] id
+  - [ ] user_id
+  - [ ] tone
+  - [ ] structure
+  - [ ] phrases
+  - [ ] signature
+  - [ ] updated_at
 
 ---
 
-11. Intégration modèle IA
-
-[ ] Choisir le provider LLM
-
-[ ] Ajouter clé API côté serveur
-
-[ ] Créer fonction classifyEmail()
-
-[ ] Créer fonction generateReply()
-
-[ ] Séparer prompts dans lib/prompts.ts
-
-
-
----
-
-12. Prompt MVP de classification
-
-[ ] Créer un prompt serveur qui classe les emails dans une seule catégorie
-
-[ ] Renvoyer JSON propre
-
-[ ] Gérer les erreurs de parsing
-
-[ ] Prévoir fallback si le modèle répond mal
-
-
+## 9. Landing page
+- [ ] Créer le hero principal
+- [ ] Ajouter titre :
+  - [ ] “Stop writing emails. Just get them done.”
+- [ ] Ajouter sous-titre :
+  - [ ] “We prepare replies. You just send.”
+- [ ] Ajouter CTA :
+  - [ ] “Connect Gmail”
+- [ ] Ajouter mini section “How it works”
+- [ ] Ajouter mini section “Why it’s different”
+- [ ] Ajouter footer simple
+- [ ] Rendre la landing responsive
+- [ ] Optimiser pour compréhension en 3 secondes
 
 ---
 
-13. Prompt MVP de génération de réponse
-
-[ ] Prompt simple :
-
-[ ] court
-
-[ ] naturel
-
-[ ] humain
-
-
-[ ] Générer une seule réponse
-
-[ ] Pas encore de style utilisateur complexe
-
-[ ] Limiter aux emails simples
-
-
+## 10. Dashboard UI
+- [ ] Créer page `/dashboard`
+- [ ] Afficher l’état loading
+- [ ] Afficher état vide
+- [ ] Créer la liste des emails
+- [ ] Pour chaque email, afficher :
+  - [ ] expéditeur
+  - [ ] sujet
+  - [ ] contenu
+- [ ] Prévoir zone de réponse sous chaque email
+- [ ] Ajouter boutons :
+  - [ ] Send
+  - [ ] Edit
+  - [ ] Ignore
+- [ ] Garder l’UI ultra simple
 
 ---
 
-14. Affichage de la réponse
-
-[ ] Sous chaque email traitable, afficher :
-
-[ ] réponse générée
-
-
-[ ] Ajouter boutons :
-
-[ ] Send
-
-[ ] Edit
-
-[ ] Ignore
-
-
-
+## 11. Récupération emails Gmail
+- [ ] Implémenter `messages.list`
+- [ ] Récupérer les derniers emails
+- [ ] Implémenter `messages.get`
+- [ ] Parser les données utiles :
+  - [ ] from
+  - [ ] subject
+  - [ ] body
+  - [ ] thread id
+- [ ] Nettoyer le HTML
+- [ ] Nettoyer signatures / quoted text si possible
+- [ ] Stocker les emails en DB
+- [ ] Afficher les emails dans le dashboard
 
 ---
 
-15. Envoi email
-
-[ ] Utiliser Gmail API send
-
-[ ] Gérer l’encodage correct du message
-
-[ ] Envoyer avec le bon compte utilisateur
-
-[ ] Marquer la réponse comme sent
-
-[ ] Afficher succès / erreur
-
-
+## 12. Récupération des emails envoyés
+- [ ] Lire la boîte “sent”
+- [ ] Récupérer les 50 à 200 derniers emails envoyés
+- [ ] Filtrer les vrais messages rédigés
+- [ ] Exclure le bruit :
+  - [ ] signatures seules
+  - [ ] réponses ultra courtes inutiles
+  - [ ] messages automatiques
+- [ ] Préparer ces emails pour analyse style
 
 ---
 
-16. Édition utilisateur
-
-[ ] Ajouter textarea modifiable
-
-[ ] Permettre modification avant envoi
-
-[ ] Sauvegarder la version éditée
-
-[ ] Marquer action edited
-
-
-
----
-
-17. Ignore
-
-[ ] Bouton Ignore
-
-[ ] Marquer action ignored
-
-[ ] Cacher ou griser l’élément
-
-
+## 13. Construction du profil style
+- [ ] Créer une fonction `buildStyleProfile()`
+- [ ] Envoyer des emails envoyés au modèle
+- [ ] Extraire :
+  - [ ] ton
+  - [ ] niveau de formalité
+  - [ ] longueur moyenne
+  - [ ] phrases fréquentes
+  - [ ] structure
+  - [ ] salutation
+  - [ ] signature
+- [ ] Sauvegarder le profil style en DB
+- [ ] Pouvoir re-générer le profil à la demande
 
 ---
 
-18. Boucle d’apprentissage minimale
-
-Au début, pas besoin d’un système complexe.
-
-[ ] Sauvegarder :
-
-[ ] réponse générée
-
-[ ] réponse éditée
-
-[ ] action finale
-
-
-[ ] Préparer le terrain pour apprentissage futur
-
-[ ] Ne pas surcomplexifier au début
-
-
+## 14. Logique de tri des emails
+- [ ] Créer les catégories :
+  - [ ] `IGNORE`
+  - [ ] `READ_ONLY`
+  - [ ] `REPLY_SIMPLE`
+  - [ ] `REPLY_COMPLEX`
+- [ ] Créer des règles simples avant IA :
+  - [ ] no-reply
+  - [ ] unsubscribe
+  - [ ] newsletters évidentes
+  - [ ] notifications automatiques
+- [ ] Créer une fonction `classifyEmail()`
+- [ ] Envoyer les cas non évidents au modèle
+- [ ] Retourner une catégorie propre
+- [ ] Sauvegarder la catégorie en DB
 
 ---
 
-19. Apprentissage du style utilisateur (phase 2)
-
-Quand le MVP tourne :
-
-[ ] Récupérer emails envoyés
-
-[ ] Filtrer vrais messages rédigés
-
-[ ] Analyser :
-
-[ ] ton
-
-[ ] longueur
-
-[ ] formules fréquentes
-
-[ ] structure
-
-
-[ ] Générer un profil style simple
-
-[ ] Injecter ce profil dans le prompt de réponse
-
-
+## 15. Prompt de classification
+- [ ] Écrire un prompt serveur qui force une seule sortie
+- [ ] Utiliser un format strict
+- [ ] Prévoir fallback si réponse invalide
+- [ ] Tester sur plusieurs types d’emails
+- [ ] Vérifier que le système reste conservateur
+- [ ] Préférer “ne pas répondre” à “mal répondre”
 
 ---
 
-20. Différenciation par contexte (phase 2)
-
-[ ] Commencer à différencier :
-
-[ ] pro
-
-[ ] perso
-
-[ ] inconnu
-
-
-[ ] Détection simple via :
-
-[ ] domaine email
-
-[ ] fréquence d’échange
-
-[ ] historique
-
-
-
+## 16. Génération de réponse
+- [ ] Créer une fonction `generateReply()`
+- [ ] Input :
+  - [ ] email reçu
+  - [ ] profil style
+  - [ ] catégorie email
+- [ ] Écrire le prompt de réponse
+- [ ] Demander une réponse :
+  - [ ] courte
+  - [ ] naturelle
+  - [ ] cohérente
+  - [ ] dans le style utilisateur
+- [ ] Sauvegarder la réponse générée en DB
+- [ ] Afficher la réponse dans le dashboard
 
 ---
 
-21. Landing page
-
-[ ] Hero clair
-
-[ ] Message principal simple
-
-[ ] Démo visuelle ou mockup
-
-[ ] CTA “Connect Gmail”
-
-[ ] Section “How it works”
-
-[ ] Section “Why it’s different”
-
-[ ] Footer simple
-
-
+## 17. Prompt de réponse
+- [ ] Injecter :
+  - [ ] résumé du style utilisateur
+  - [ ] message reçu
+  - [ ] objectif de réponse simple
+- [ ] Demander une sortie sans sur-explication
+- [ ] Éviter le ton générique “AI”
+- [ ] Tester plusieurs variantes
+- [ ] Choisir la plus naturelle
 
 ---
 
-22. Wording
-
-[ ] Ne pas surutiliser “AI”
-
-[ ] Ne pas vendre “automation”
-
-[ ] Vendre :
-
-[ ] temps gagné
-
-[ ] réponses prêtes
-
-[ ] validation en 1 clic
-
-
-[ ] Angle :
-
-[ ] “Stop writing emails”
-
-[ ] “Just get them done”
-
-
-
+## 18. Édition manuelle
+- [ ] Ajouter un mode édition
+- [ ] Permettre modification de la réponse
+- [ ] Sauvegarder la version éditée
+- [ ] Mettre à jour l’action en `edited`
+- [ ] Garder le flux ultra rapide
 
 ---
 
-23. Sécurité et confiance
-
-[ ] Expliquer clairement l’accès Gmail
-
-[ ] Expliquer que rien n’est envoyé sans validation
-
-[ ] Créer une mini page privacy
-
-[ ] Créer une mini page terms
-
-[ ] Afficher le cadre de fonctionnement clairement
-
-
+## 19. Envoi Gmail
+- [ ] Créer la fonction `sendEmail()`
+- [ ] Encoder correctement le message
+- [ ] Utiliser Gmail API send
+- [ ] Gérer les erreurs d’envoi
+- [ ] Marquer la réponse en `sent`
+- [ ] Afficher confirmation visuelle
 
 ---
 
-24. Analytics
-
-[ ] Ajouter analytics simple
-
-[ ] Suivre :
-
-[ ] connect Gmail
-
-[ ] email classé
-
-[ ] réponse générée
-
-[ ] send
-
-[ ] edit
-
-[ ] ignore
-
-
-[ ] Mesurer :
-
-[ ] taux d’usage
-
-[ ] taux d’envoi
-
-[ ] taux d’édition
-
-
-
+## 20. Ignore
+- [ ] Ajouter bouton Ignore
+- [ ] Sauvegarder action `ignored`
+- [ ] Masquer ou désactiver la carte email
+- [ ] Préserver l’action pour apprentissage futur
 
 ---
 
-25. Validation produit
-
-[ ] Tester toi-même sur vrai compte
-
-[ ] Tester avec 2–5 utilisateurs proches
-
-[ ] Observer :
-
-[ ] comprennent-ils le produit ?
-
-[ ] font-ils confiance ?
-
-[ ] cliquent-ils sur send ?
-
-
-[ ] Corriger avant d’élargir
-
-
+## 21. Boucle d’apprentissage
+- [ ] Sauvegarder pour chaque email :
+  - [ ] réponse générée
+  - [ ] réponse éditée
+  - [ ] action finale
+- [ ] Construire une logique simple :
+  - [ ] si envoyé sans modif = bon signal
+  - [ ] si modifié = signal de correction
+  - [ ] si ignoré = signal négatif
+- [ ] Préparer l’exploitation future de ces signaux
 
 ---
 
-26. Pricing initial
-
-[ ] Garder simple
-
-[ ] Exemple :
-
-[ ] free limité
-
-[ ] 9€/mois
-
-
-[ ] Ne pas complexifier trop tôt
-
-[ ] Se concentrer sur usage quotidien avant optimisation pricing
-
-
+## 22. Détection relationnelle simple
+- [ ] Déterminer si le contact est :
+  - [ ] pro
+  - [ ] perso
+  - [ ] inconnu
+- [ ] Utiliser au début :
+  - [ ] domaine email
+  - [ ] fréquence d’échange
+  - [ ] historique de réponses
+- [ ] Ne pas sur-complexifier le MVP
 
 ---
 
-27. Acquisition minimale
-
-[ ] Préparer une courte vidéo démo
-
-[ ] Poster sur X / LinkedIn / Reddit
-
-[ ] Montrer :
-
-[ ] email reçu
-
-[ ] réponse prête
-
-[ ] clic send
-
-
-[ ] Chercher 10 premiers utilisateurs, pas 10 000
-
-
+## 23. Sécurité et confiance
+- [ ] Afficher clairement :
+  - [ ] rien n’est envoyé sans validation
+  - [ ] accès utilisé uniquement pour préparer les réponses
+- [ ] Créer une page privacy simple
+- [ ] Créer une page terms simple
+- [ ] Clarifier la suppression des données si besoin
+- [ ] Rassurer dès la landing et le dashboard
 
 ---
 
-28. Roadmap produit intelligente
-
-MVP
-
-[ ] Gmail
-
-[ ] tri simple
-
-[ ] réponse générée
-
-[ ] validation
-
-[ ] send
-
-
-V1
-
-[ ] style utilisateur
-
-[ ] meilleur tri
-
-[ ] historique actions
-
-
-V2
-
-[ ] contexte relationnel
-
-[ ] réponses plus personnalisées
-
-[ ] notification-first
-
-
-V3
-
-[ ] autres canaux
-
-[ ] orchestration
-
-[ ] exécution plus large
-
-
+## 24. Analytics
+- [ ] Ajouter analytics simple
+- [ ] Suivre :
+  - [ ] click Connect Gmail
+  - [ ] auth success
+  - [ ] emails fetched
+  - [ ] email classified
+  - [ ] reply generated
+  - [ ] send
+  - [ ] edit
+  - [ ] ignore
+- [ ] Mesurer :
+  - [ ] taux de connexion
+  - [ ] taux d’envoi
+  - [ ] taux d’édition
+  - [ ] fréquence d’usage
 
 ---
 
-🎯 RÈGLE ABSOLUE
-
-Ne pas essayer de construire la vision complète.
-
-Ton seul objectif de départ :
-
-[ ] connecter Gmail
-
-[ ] afficher un email
-
-[ ] générer une réponse
-
-[ ] cliquer sur send
-
-
-Si ça fonctionne, tu as déjà un vrai produit.
-
+## 25. Tests manuels
+- [ ] Tester le flow complet toi-même
+- [ ] Tester avec plusieurs vrais emails
+- [ ] Vérifier :
+  - [ ] tri
+  - [ ] qualité réponse
+  - [ ] envoi
+  - [ ] UI
+- [ ] Corriger les bugs majeurs
+- [ ] Rendre le flow stable avant partage
 
 ---
 
-✅ MVP DONE SI
-
-[ ] un utilisateur connecte Gmail
-
-[ ] le système récupère ses emails
-
-[ ] il classe au moins quelques emails correctement
-
-[ ] il propose une réponse simple
-
-[ ] l’utilisateur clique send
-
-[ ] l’email part réellement
-
-
-Quand ça arrive, tu n’es plus dans l’idée.
-Tu es dans le produit.
-
+## 26. Premiers utilisateurs
+- [ ] Trouver 3 à 10 utilisateurs test
+- [ ] Leur faire connecter Gmail
+- [ ] Observer ce qu’ils font réellement
+- [ ] Noter :
+  - [ ] ce qu’ils comprennent
+  - [ ] ce qu’ils ignorent
+  - [ ] ce qu’ils envoient
+  - [ ] ce qu’ils modifient
+- [ ] Prioriser les corrections sur l’usage réel
 
 ---
 
-Si tu veux, l’étape suivante c’est que je te donne **la structure exacte du repo Next.js/Vercel** avec les fichiers à créer.
+## 27. Pricing initial
+- [ ] Définir free plan simple :
+  - [ ] ex. 10 ou 20 réponses / mois
+- [ ] Définir paid plan simple :
+  - [ ] 9€/mois
+- [ ] Ne pas multiplier les plans au début
+- [ ] Se concentrer sur usage avant optimisation tarifaire
+
+---
+
+## 28. Démo et distribution
+- [ ] Préparer une mini démo vidéo
+- [ ] Montrer :
+  - [ ] email reçu
+  - [ ] réponse générée
+  - [ ] clic send
+- [ ] Poster sur :
+  - [ ] X
+  - [ ] LinkedIn
+  - [ ] Reddit
+- [ ] Chercher 10 premiers utilisateurs réels
+- [ ] Ne pas attendre le produit “parfait”
+
+---
+
+## 29. Critères de validation MVP
+- [ ] Un utilisateur connecte Gmail
+- [ ] Le système récupère ses emails
+- [ ] Le système classe correctement certains emails
+- [ ] Le système propose des réponses simples
+- [ ] L’utilisateur clique réellement sur Send
+- [ ] L’email part réellement
+- [ ] L’utilisateur revient utiliser le produit
+
+---
+
+## 30. Roadmap après MVP
+- [ ] Améliorer le style utilisateur
+- [ ] Améliorer le tri
+- [ ] Ajouter notifications “reply ready”
+- [ ] Ajouter meilleure gestion relationnelle
+- [ ] Ajouter autres types de réponses
+- [ ] Ajouter autres canaux plus tard
+- [ ] Garder la même logique :
+  - [ ] simple devant
+  - [ ] intelligent derrière
+
+---
+
+## 31. Règle absolue
+- [ ] Ne pas construire la vision complète
+- [ ] Ne pas ajouter 20 features
+- [ ] Ne pas viser perfection
+- [ ] Viser un seul résultat :
+
+> un utilisateur reçoit un email, voit une réponse prête, clique sur Send, et gagne du temps
+
+---
