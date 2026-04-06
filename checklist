@@ -1,0 +1,729 @@
+Parfait.
+👉 Donc on adapte la checklist à Next.js + Vercel.
+
+Et surtout, si on continue vers du code après, il faudra rester compatible Vercel dès le départ.
+
+
+---
+
+✅ CHECKLIST A À Z — GETMAILDONE (NEXT.JS + VERCEL)
+
+1. Base projet
+
+[ ] Créer le projet Next.js
+
+[ ] Push sur GitHub
+
+[ ] Connecter le repo à Vercel
+
+[ ] Vérifier qu’un deploy vide fonctionne
+
+[ ] Ajouter un .env.local
+
+[ ] Ajouter les variables aussi dans Vercel
+
+
+
+---
+
+2. Domaine et branding minimal
+
+[ ] Acheter / connecter getmaildone.com
+
+[ ] Définir le nom produit : GetMailDone
+
+[ ] Définir la tagline principale
+
+[ ] Définir une phrase de sous-titre claire
+
+[ ] Préparer un logo texte simple provisoire
+
+
+
+---
+
+3. Architecture technique minimale
+
+[ ] Choisir App Router Next.js
+
+[ ] Créer structure propre :
+
+[ ] app/
+
+[ ] components/
+
+[ ] lib/
+
+[ ] types/
+
+
+[ ] Prévoir pages :
+
+[ ] /
+
+[ ] /dashboard
+
+[ ] /api/auth/google
+
+[ ] /api/auth/callback/google
+
+[ ] /api/emails
+
+[ ] /api/reply
+
+[ ] /api/send
+
+
+
+
+---
+
+4. Google Cloud / Gmail API
+
+[ ] Créer un projet Google Cloud
+
+[ ] Activer Gmail API
+
+[ ] Configurer l’écran de consentement OAuth
+
+[ ] Créer OAuth Client ID
+
+[ ] Ajouter les redirect URIs :
+
+[ ] local
+
+[ ] prod Vercel
+
+
+[ ] Récupérer :
+
+[ ] GOOGLE_CLIENT_ID
+
+[ ] GOOGLE_CLIENT_SECRET
+
+
+
+
+---
+
+5. Auth Gmail
+
+[ ] Ajouter bouton “Connect Gmail”
+
+[ ] Rediriger vers OAuth Google
+
+[ ] Gérer callback OAuth
+
+[ ] Récupérer :
+
+[ ] access token
+
+[ ] refresh token
+
+
+[ ] Stocker la session utilisateur
+
+[ ] Vérifier que l’utilisateur connecté peut accéder au dashboard
+
+
+
+---
+
+6. Choix stockage
+
+Comme tu es sur Vercel, il faut éviter les bricolages temporaires qui cassent vite.
+
+[ ] Choisir une base :
+
+[ ] Supabase
+
+[ ] ou Postgres Vercel
+
+
+[ ] Créer les tables minimales
+
+[ ] Stocker :
+
+[ ] user
+
+[ ] tokens Gmail
+
+[ ] emails importés
+
+[ ] réponses générées
+
+[ ] actions utilisateur
+
+
+
+
+---
+
+7. Schéma minimal de données
+
+[ ] users
+
+[ ] id
+
+[ ] email
+
+[ ] name
+
+
+[ ] gmail_accounts
+
+[ ] user_id
+
+[ ] access_token
+
+[ ] refresh_token
+
+[ ] expiry_date
+
+
+[ ] emails
+
+[ ] id
+
+[ ] user_id
+
+[ ] gmail_message_id
+
+[ ] from_email
+
+[ ] subject
+
+[ ] body
+
+[ ] category
+
+
+[ ] suggested_replies
+
+[ ] id
+
+[ ] email_id
+
+[ ] generated_reply
+
+[ ] edited_reply
+
+[ ] action (sent, edited, ignored, pending)
+
+
+
+
+---
+
+8. Récupération des emails
+
+[ ] Utiliser Gmail API messages.list
+
+[ ] Récupérer les derniers emails
+
+[ ] Utiliser messages.get pour le détail
+
+[ ] Parser :
+
+[ ] sujet
+
+[ ] expéditeur
+
+[ ] contenu texte
+
+
+[ ] Nettoyer :
+
+[ ] signatures
+
+[ ] HTML inutile
+
+[ ] bruit
+
+
+
+
+---
+
+9. Affichage dashboard
+
+[ ] Créer page /dashboard
+
+[ ] Afficher liste des emails
+
+[ ] Afficher :
+
+[ ] From
+
+[ ] Subject
+
+[ ] Body
+
+
+[ ] Design simple, lisible, propre
+
+[ ] Prévoir état loading
+
+[ ] Prévoir état vide
+
+
+
+---
+
+10. Première logique de tri
+
+Avant même de répondre, le système doit savoir quoi faire.
+
+[ ] Créer 4 catégories :
+
+[ ] IGNORE
+
+[ ] READ_ONLY
+
+[ ] REPLY_SIMPLE
+
+[ ] REPLY_COMPLEX
+
+
+[ ] Ajouter filtre simple :
+
+[ ] no-reply
+
+[ ] unsubscribe
+
+[ ] newsletters évidentes
+
+
+[ ] Ajouter appel LLM pour classifier les cas non évidents
+
+
+
+---
+
+11. Intégration modèle IA
+
+[ ] Choisir le provider LLM
+
+[ ] Ajouter clé API côté serveur
+
+[ ] Créer fonction classifyEmail()
+
+[ ] Créer fonction generateReply()
+
+[ ] Séparer prompts dans lib/prompts.ts
+
+
+
+---
+
+12. Prompt MVP de classification
+
+[ ] Créer un prompt serveur qui classe les emails dans une seule catégorie
+
+[ ] Renvoyer JSON propre
+
+[ ] Gérer les erreurs de parsing
+
+[ ] Prévoir fallback si le modèle répond mal
+
+
+
+---
+
+13. Prompt MVP de génération de réponse
+
+[ ] Prompt simple :
+
+[ ] court
+
+[ ] naturel
+
+[ ] humain
+
+
+[ ] Générer une seule réponse
+
+[ ] Pas encore de style utilisateur complexe
+
+[ ] Limiter aux emails simples
+
+
+
+---
+
+14. Affichage de la réponse
+
+[ ] Sous chaque email traitable, afficher :
+
+[ ] réponse générée
+
+
+[ ] Ajouter boutons :
+
+[ ] Send
+
+[ ] Edit
+
+[ ] Ignore
+
+
+
+
+---
+
+15. Envoi email
+
+[ ] Utiliser Gmail API send
+
+[ ] Gérer l’encodage correct du message
+
+[ ] Envoyer avec le bon compte utilisateur
+
+[ ] Marquer la réponse comme sent
+
+[ ] Afficher succès / erreur
+
+
+
+---
+
+16. Édition utilisateur
+
+[ ] Ajouter textarea modifiable
+
+[ ] Permettre modification avant envoi
+
+[ ] Sauvegarder la version éditée
+
+[ ] Marquer action edited
+
+
+
+---
+
+17. Ignore
+
+[ ] Bouton Ignore
+
+[ ] Marquer action ignored
+
+[ ] Cacher ou griser l’élément
+
+
+
+---
+
+18. Boucle d’apprentissage minimale
+
+Au début, pas besoin d’un système complexe.
+
+[ ] Sauvegarder :
+
+[ ] réponse générée
+
+[ ] réponse éditée
+
+[ ] action finale
+
+
+[ ] Préparer le terrain pour apprentissage futur
+
+[ ] Ne pas surcomplexifier au début
+
+
+
+---
+
+19. Apprentissage du style utilisateur (phase 2)
+
+Quand le MVP tourne :
+
+[ ] Récupérer emails envoyés
+
+[ ] Filtrer vrais messages rédigés
+
+[ ] Analyser :
+
+[ ] ton
+
+[ ] longueur
+
+[ ] formules fréquentes
+
+[ ] structure
+
+
+[ ] Générer un profil style simple
+
+[ ] Injecter ce profil dans le prompt de réponse
+
+
+
+---
+
+20. Différenciation par contexte (phase 2)
+
+[ ] Commencer à différencier :
+
+[ ] pro
+
+[ ] perso
+
+[ ] inconnu
+
+
+[ ] Détection simple via :
+
+[ ] domaine email
+
+[ ] fréquence d’échange
+
+[ ] historique
+
+
+
+
+---
+
+21. Landing page
+
+[ ] Hero clair
+
+[ ] Message principal simple
+
+[ ] Démo visuelle ou mockup
+
+[ ] CTA “Connect Gmail”
+
+[ ] Section “How it works”
+
+[ ] Section “Why it’s different”
+
+[ ] Footer simple
+
+
+
+---
+
+22. Wording
+
+[ ] Ne pas surutiliser “AI”
+
+[ ] Ne pas vendre “automation”
+
+[ ] Vendre :
+
+[ ] temps gagné
+
+[ ] réponses prêtes
+
+[ ] validation en 1 clic
+
+
+[ ] Angle :
+
+[ ] “Stop writing emails”
+
+[ ] “Just get them done”
+
+
+
+
+---
+
+23. Sécurité et confiance
+
+[ ] Expliquer clairement l’accès Gmail
+
+[ ] Expliquer que rien n’est envoyé sans validation
+
+[ ] Créer une mini page privacy
+
+[ ] Créer une mini page terms
+
+[ ] Afficher le cadre de fonctionnement clairement
+
+
+
+---
+
+24. Analytics
+
+[ ] Ajouter analytics simple
+
+[ ] Suivre :
+
+[ ] connect Gmail
+
+[ ] email classé
+
+[ ] réponse générée
+
+[ ] send
+
+[ ] edit
+
+[ ] ignore
+
+
+[ ] Mesurer :
+
+[ ] taux d’usage
+
+[ ] taux d’envoi
+
+[ ] taux d’édition
+
+
+
+
+---
+
+25. Validation produit
+
+[ ] Tester toi-même sur vrai compte
+
+[ ] Tester avec 2–5 utilisateurs proches
+
+[ ] Observer :
+
+[ ] comprennent-ils le produit ?
+
+[ ] font-ils confiance ?
+
+[ ] cliquent-ils sur send ?
+
+
+[ ] Corriger avant d’élargir
+
+
+
+---
+
+26. Pricing initial
+
+[ ] Garder simple
+
+[ ] Exemple :
+
+[ ] free limité
+
+[ ] 9€/mois
+
+
+[ ] Ne pas complexifier trop tôt
+
+[ ] Se concentrer sur usage quotidien avant optimisation pricing
+
+
+
+---
+
+27. Acquisition minimale
+
+[ ] Préparer une courte vidéo démo
+
+[ ] Poster sur X / LinkedIn / Reddit
+
+[ ] Montrer :
+
+[ ] email reçu
+
+[ ] réponse prête
+
+[ ] clic send
+
+
+[ ] Chercher 10 premiers utilisateurs, pas 10 000
+
+
+
+---
+
+28. Roadmap produit intelligente
+
+MVP
+
+[ ] Gmail
+
+[ ] tri simple
+
+[ ] réponse générée
+
+[ ] validation
+
+[ ] send
+
+
+V1
+
+[ ] style utilisateur
+
+[ ] meilleur tri
+
+[ ] historique actions
+
+
+V2
+
+[ ] contexte relationnel
+
+[ ] réponses plus personnalisées
+
+[ ] notification-first
+
+
+V3
+
+[ ] autres canaux
+
+[ ] orchestration
+
+[ ] exécution plus large
+
+
+
+---
+
+🎯 RÈGLE ABSOLUE
+
+Ne pas essayer de construire la vision complète.
+
+Ton seul objectif de départ :
+
+[ ] connecter Gmail
+
+[ ] afficher un email
+
+[ ] générer une réponse
+
+[ ] cliquer sur send
+
+
+Si ça fonctionne, tu as déjà un vrai produit.
+
+
+---
+
+✅ MVP DONE SI
+
+[ ] un utilisateur connecte Gmail
+
+[ ] le système récupère ses emails
+
+[ ] il classe au moins quelques emails correctement
+
+[ ] il propose une réponse simple
+
+[ ] l’utilisateur clique send
+
+[ ] l’email part réellement
+
+
+Quand ça arrive, tu n’es plus dans l’idée.
+Tu es dans le produit.
+
+
+---
+
+Si tu veux, l’étape suivante c’est que je te donne **la structure exacte du repo Next.js/Vercel** avec les fichiers à créer.
