@@ -1,32 +1,55 @@
+import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
-import { getGoogleOAuthClient } from "../../../../../lib/google";
 
 export async function GET(request: NextRequest) {
   try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    console.log("CALLBACK GOOGLE_CLIENT_ID exists:", Boolean(clientId));
+    console.log("CALLBACK GOOGLE_CLIENT_SECRET exists:", Boolean(clientSecret));
+    console.log("CALLBACK GOOGLE_REDIRECT_URI exists:", Boolean(redirectUri));
+    console.log("CALLBACK NEXT_PUBLIC_APP_URL exists:", Boolean(appUrl));
+
+    if (!clientId || !clientSecret || !redirectUri || !appUrl) {
+      throw new Error(
+        `Missing envs in callback: GOOGLE_CLIENT_ID=${Boolean(
+          clientId
+        )}, GOOGLE_CLIENT_SECRET=${Boolean(
+          clientSecret
+        )}, GOOGLE_REDIRECT_URI=${Boolean(
+          redirectUri
+        )}, NEXT_PUBLIC_APP_URL=${Boolean(appUrl)}`
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
 
     if (!code) {
-      return NextResponse.json(
-        { error: "Missing OAuth code" },
-        { status: 400 }
-      );
+      throw new Error("Missing OAuth code");
     }
 
-    const oauth2Client = getGoogleOAuthClient();
+    const oauth2Client = new google.auth.OAuth2(
+      clientId,
+      clientSecret,
+      redirectUri
+    );
 
     const { tokens } = await oauth2Client.getToken(code);
 
-    console.log("TOKENS:", tokens);
+    console.log("CALLBACK TOKENS RECEIVED:", Boolean(tokens?.access_token));
 
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
-    );
+    return NextResponse.redirect(`${appUrl}/dashboard`);
   } catch (error: any) {
-    console.error("OAUTH ERROR:", error);
+    console.error("CALLBACK OAUTH ERROR:", error);
 
     return NextResponse.json(
-      { error: error.message || "OAuth failed" },
+      {
+        error: error?.message || "OAuth callback failed",
+      },
       { status: 500 }
     );
   }
