@@ -63,20 +63,29 @@ export default function HomePage() {
           move on.
         </p>
 
-        <button
+        <a
+          href="/api/auth/google"
           style={{
-            border: "none",
-            borderRadius: "999px",
-            padding: "14px 22px",
-            fontSize: "16px",
-            fontWeight: 700,
-            cursor: "pointer",
-            background: "#0f172a",
-            color: "#ffffff",
+            display: "inline-block",
+            textDecoration: "none",
           }}
         >
-          Connect Gmail
-        </button>
+          <span
+            style={{
+              display: "inline-block",
+              border: "none",
+              borderRadius: "999px",
+              padding: "14px 22px",
+              fontSize: "16px",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "#0f172a",
+              color: "#ffffff",
+            }}
+          >
+            Connect Gmail
+          </span>
+        </a>
       </section>
     </main>
   );
