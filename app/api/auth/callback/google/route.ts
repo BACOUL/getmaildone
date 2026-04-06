@@ -8,6 +8,9 @@ export async function GET(request: NextRequest) {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
+    console.log("CALLBACK URL:", request.url);
+    console.log("CALLBACK SEARCH:", new URL(request.url).search);
+
     console.log("CALLBACK GOOGLE_CLIENT_ID exists:", Boolean(clientId));
     console.log("CALLBACK GOOGLE_CLIENT_SECRET exists:", Boolean(clientSecret));
     console.log("CALLBACK GOOGLE_REDIRECT_URI exists:", Boolean(redirectUri));
@@ -25,11 +28,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get("code");
+    const url = new URL(request.url);
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+
+    console.log("CALLBACK CODE:", code);
+    console.log("CALLBACK ERROR:", error);
 
     if (!code) {
-      throw new Error("Missing OAuth code");
+      throw new Error(`Missing OAuth code. Google returned error=${error}`);
     }
 
     const oauth2Client = new google.auth.OAuth2(
