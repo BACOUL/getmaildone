@@ -3,7 +3,7 @@ import { google } from "googleapis";
 
 export async function GET() {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const tokenCookie = cookieStore.get("google_tokens");
 
     if (!tokenCookie) {
