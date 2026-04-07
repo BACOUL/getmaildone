@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -48,6 +49,14 @@ export async function GET(request: NextRequest) {
     const { tokens } = await oauth2Client.getToken(code);
 
     console.log("CALLBACK TOKENS RECEIVED:", Boolean(tokens?.access_token));
+
+    const cookieStore = await cookies();
+    cookieStore.set("google_tokens", JSON.stringify(tokens), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+    });
 
     return NextResponse.redirect(`${appUrl}/dashboard`);
   } catch (error: any) {
