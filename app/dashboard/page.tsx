@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type GmailMessage = {
   id: string;
@@ -43,10 +43,14 @@ type ReplyVariant = {
   text: string;
 };
 
+type FilterMode = "reply" | "all";
+
 export default function DashboardPage() {
   const [emails, setEmails] = useState<GmailMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+
+  const [filter, setFilter] = useState<FilterMode>("reply");
 
   const [replies, setReplies] = useState<Record<string, ReplyVariant[]>>({});
   const [selectedReplies, setSelectedReplies] = useState<Record<string, string>>(
@@ -112,6 +116,7 @@ export default function DashboardPage() {
           needsReply: email.needsReply,
           suggestedAction: email.suggestedAction,
           styleProfile,
+          threadId: email.threadId,
         }),
       });
 
@@ -198,6 +203,14 @@ export default function DashboardPage() {
       setSendLoadingId(null);
     }
   };
+
+  const visibleEmails = useMemo(() => {
+    if (filter === "reply") {
+      return emails.filter((email) => email.needsReply);
+    }
+
+    return emails;
+  }, [emails, filter]);
 
   const getCategoryLabel = (category: GmailMessage["category"]) => {
     switch (category) {
@@ -321,30 +334,83 @@ export default function DashboardPage() {
             color: "#334155",
           }}
         >
-          Load your Gmail messages and identify what actually needs a reply.
+          Load your Gmail messages and focus on what actually needs a reply.
         </p>
 
-        <button
-          onClick={loadEmails}
-          disabled={loading}
+        <div
           style={{
-            display: "inline-block",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "12px",
             marginTop: "24px",
-            padding: "14px 22px",
-            borderRadius: "999px",
-            background: "#0f172a",
-            color: "#ffffff",
-            border: "none",
-            fontWeight: 700,
-            fontSize: "16px",
-            cursor: loading ? "default" : "pointer",
-            opacity: loading ? 0.7 : 1,
-            width: "100%",
-            maxWidth: "220px",
+            alignItems: "center",
           }}
         >
-          {loading ? "Loading..." : "Load Emails"}
-        </button>
+          <button
+            onClick={loadEmails}
+            disabled={loading}
+            style={{
+              display: "inline-block",
+              padding: "14px 22px",
+              borderRadius: "999px",
+              background: "#0f172a",
+              color: "#ffffff",
+              border: "none",
+              fontWeight: 700,
+              fontSize: "16px",
+              cursor: loading ? "default" : "pointer",
+              opacity: loading ? 0.7 : 1,
+              width: "100%",
+              maxWidth: "220px",
+            }}
+          >
+            {loading ? "Loading..." : "Load Emails"}
+          </button>
+
+          <button
+            onClick={() => setFilter("reply")}
+            style={{
+              padding: "12px 16px",
+              borderRadius: "999px",
+              background: filter === "reply" ? "#0f172a" : "#ffffff",
+              color: filter === "reply" ? "#ffffff" : "#0f172a",
+              border: "1px solid #cbd5e1",
+              fontWeight: 700,
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
+            Needs reply
+          </button>
+
+          <button
+            onClick={() => setFilter("all")}
+            style={{
+              padding: "12px 16px",
+              borderRadius: "999px",
+              background: filter === "all" ? "#0f172a" : "#ffffff",
+              color: filter === "all" ? "#ffffff" : "#0f172a",
+              border: "1px solid #cbd5e1",
+              fontWeight: 700,
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
+            All
+          </button>
+
+          {emails.length > 0 ? (
+            <span
+              style={{
+                fontSize: "14px",
+                color: "#475569",
+                fontWeight: 600,
+              }}
+            >
+              Showing {visibleEmails.length} / {emails.length}
+            </span>
+          ) : null}
+        </div>
 
         {error ? (
           <div
@@ -369,7 +435,7 @@ export default function DashboardPage() {
             gap: "14px",
           }}
         >
-          {!loading && emails.length === 0 && !error ? (
+          {!loading && visibleEmails.length === 0 && !error ? (
             <div
               style={{
                 padding: "20px",
@@ -380,11 +446,13 @@ export default function DashboardPage() {
                 width: "100%",
               }}
             >
-              No emails loaded yet.
+              {emails.length > 0 && filter === "reply"
+                ? "No emails currently need a reply."
+                : "No emails loaded yet."}
             </div>
           ) : null}
 
-          {emails.map((email) => {
+          {visibleEmails.map((email) => {
             const categoryColors = getCategoryColors(email.category);
             const emailReplies = replies[email.id] || [];
             const selectedReply = selectedReplies[email.id] || "";
@@ -846,4 +914,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-                }
+              }
