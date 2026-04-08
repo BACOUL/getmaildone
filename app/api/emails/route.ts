@@ -63,6 +63,88 @@ function cleanEmailBody(text: string) {
   return cleaned.slice(0, 500);
 }
 
+function isUsefulEmail(from: string, subject: string, body: string, snippet: string) {
+  const haystack = `${from} ${subject} ${body} ${snippet}`.toLowerCase();
+
+  const blockedPatterns = [
+    "newsletter",
+    "noreply",
+    "no-reply",
+    "do-not-reply",
+    "donotreply",
+    "notification@",
+    "notifications@",
+    "mailchimp",
+    "sendgrid",
+    "hubspot",
+    "marketing",
+    "promo",
+    "promotion",
+    "promotions",
+    "discount",
+    "soldes",
+    "offre spéciale",
+    "special offer",
+    "unsubscribe",
+    "désabonner",
+    "manage preferences",
+    "préférences",
+    "view in browser",
+    "voir dans le navigateur",
+    "privacy policy",
+    "politique de confidentialité",
+    "terms of service",
+    "conditions générales",
+    "receipts",
+    "receipt",
+    "facture",
+    "invoice",
+    "order confirmed",
+    "commande confirmée",
+    "shipping confirmation",
+    "expédiée",
+    "expedition",
+    "tracking number",
+    "numéro de suivi",
+    "indeed for employers",
+    "orchestra",
+    "support@",
+    "contact@",
+  ];
+
+  const positivePatterns = [
+    "bonjour",
+    "hello",
+    "hi ",
+    "salut",
+    "merci",
+    "question",
+    "rendez-vous",
+    "meeting",
+    "disponible",
+    "available",
+    "pouvez-vous",
+    "could you",
+    "please",
+    "prix",
+    "taille",
+    "spa",
+    "message",
+    "reply",
+    "répondre",
+    "leboncoin",
+  ];
+
+  const isBlocked = blockedPatterns.some((pattern) => haystack.includes(pattern));
+  const isPositive = positivePatterns.some((pattern) => haystack.includes(pattern));
+
+  if (isBlocked && !isPositive) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -87,7 +169,7 @@ export async function GET() {
 
     const list = await gmail.users.messages.list({
       userId: "me",
-      maxResults: 5,
+      maxResults: 15,
     });
 
     const messages = list.data.messages || [];
@@ -110,20 +192,25 @@ export async function GET() {
 
         const rawBody = extractBodyFromPayload(full.data.payload);
         const cleanedBody = cleanEmailBody(rawBody);
+        const cleanedSnippet = decodeHtml(full.data.snippet || "");
+
+        if (!isUsefulEmail(from, subject, cleanedBody, cleanedSnippet)) {
+          return null;
+        }
 
         return {
           id: msg.id,
           threadId: msg.threadId,
           subject: decodeHtml(subject),
           from: decodeHtml(from),
-          snippet: decodeHtml(full.data.snippet || ""),
+          snippet: cleanedSnippet,
           body: cleanedBody,
         };
       })
     );
 
     return NextResponse.json({
-      messages: detailedMessages,
+      messages: detailedMessages.filter(Boolean).slice(0, 5),
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -131,4 +218,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+    }
