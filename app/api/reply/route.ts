@@ -16,11 +16,16 @@ type StyleProfile = {
   sampleCount?: number;
 };
 
+type ReplyVariant = {
+  type: "short" | "balanced" | "detailed";
+  text: string;
+};
+
 function buildStyleInstructions(styleProfile?: StyleProfile) {
   if (!styleProfile) {
     return `
 No strong personal style profile is available yet.
-Write like a natural human, short, clear, polite, and practical.
+Write like a natural human: short, clear, polite, practical.
 `;
   }
 
@@ -56,6 +61,34 @@ Important:
 `;
 }
 
+function normalizeReplies(raw: any): ReplyVariant[] {
+  if (!Array.isArray(raw)) return [];
+
+  const validTypes: Array<ReplyVariant["type"]> = ["short", "balanced", "detailed"];
+
+  const cleaned = raw
+    .map((item) => {
+      const type = validTypes.includes(item?.type) ? item.type : null;
+      const text = typeof item?.text === "string" ? item.text.trim() : "";
+
+      if (!type || !text) return null;
+
+      return { type, text } as ReplyVariant;
+    })
+    .filter(Boolean) as ReplyVariant[];
+
+  const byType = new Map<ReplyVariant["type"], ReplyVariant>();
+  for (const reply of cleaned) {
+    if (!byType.has(reply.type)) {
+      byType.set(reply.type, reply);
+    }
+  }
+
+  return validTypes
+    .map((type) => byType.get(type))
+    .filter(Boolean) as ReplyVariant[];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -86,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     if (needsReply === false || suggestedAction === "ignore") {
       return NextResponse.json({
-        reply: "",
+        replies: [],
         skipped: true,
         reason: "This email does not appear to require a reply.",
       });
@@ -109,10 +142,15 @@ Email body:
 ${body}
 
 Your task:
-Write a short, natural reply that the user would realistically send.
+Generate 3 realistic reply options that the user could actually send.
+
+Reply types:
+1. short = very concise, direct
+2. balanced = best default option, natural and practical
+3. detailed = more complete, more reassuring, still human
 
 Rules:
-- Return only the reply text
+- Return STRICT JSON only
 - Do not mention AI
 - Do not explain your reasoning
 - Do not repeat the original email
@@ -120,6 +158,15 @@ Rules:
 - If the email is a simple question, answer directly
 - If the email suggests commercial interest, keep the answer useful and practical
 - If details are missing, ask one short clarifying question instead of inventing
+
+Expected JSON format:
+{
+  "replies": [
+    { "type": "short", "text": "..." },
+    { "type": "balanced", "text": "..." },
+    { "type": "detailed", "text": "..." }
+  ]
+}
 `;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -130,12 +177,13 @@ Rules:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.35,
+        temperature: 0.4,
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              "You write realistic email replies in the user's personal style.",
+              "You write realistic email replies in the user's personal style. Return only valid JSON.",
           },
           {
             role: "user",
@@ -154,10 +202,36 @@ Rules:
       );
     }
 
-    const reply = data?.choices?.[0]?.message?.content?.trim();
+    const content = data?.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      return NextResponse.json(
+        { error: "No reply generated." },
+        { status: 500 }
+      );
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON returned by model." },
+        { status: 500 }
+      );
+    }
+
+    const replies = normalizeReplies(parsed?.replies);
+
+    if (!replies.length) {
+      return NextResponse.json(
+        { error: "No valid replies generated." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
-      reply: reply || "No reply generated.",
+      replies,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -165,4 +239,4 @@ Rules:
       { status: 500 }
     );
   }
-}
+      }
