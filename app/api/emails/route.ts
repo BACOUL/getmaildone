@@ -84,6 +84,99 @@ function cleanEmailBody(text: string) {
   return cleaned.slice(0, 1200);
 }
 
+function isHumanLikeEmail(
+  from: string,
+  subject: string,
+  body: string,
+  snippet: string
+) {
+  const text = `${from} ${subject} ${body} ${snippet}`.toLowerCase();
+
+  const humanSignals = [
+    "bonjour",
+    "bonsoir",
+    "salut",
+    "hello",
+    "hi ",
+    "merci",
+    "je ",
+    "j'ai",
+    "j aimerais",
+    "je voudrais",
+    "vous ",
+    "tu ",
+    "disponible",
+    "prix",
+    "rendez-vous",
+    "meeting",
+    "intéressé",
+    "interesse",
+    "acheteur",
+    "vendeur",
+    "leboncoin",
+    "marketplace",
+    "?",
+  ];
+
+  const machineSignals = [
+    "unsubscribe",
+    "désabonner",
+    "view in browser",
+    "voir dans le navigateur",
+    "privacy policy",
+    "conditions générales",
+    "terms of service",
+    "newsletter",
+    "promotion",
+    "promotions",
+    "promo",
+    "marketing",
+    "campaign",
+    "mailchimp",
+    "hubspot",
+    "tracking number",
+    "commande confirmée",
+    "order confirmed",
+    "invoice",
+    "facture",
+    "receipt",
+    "receipts",
+    "no-reply",
+    "noreply",
+    "do-not-reply",
+    "notification@",
+    "notifications@",
+  ];
+
+  let score = 0;
+
+  for (const signal of humanSignals) {
+    if (text.includes(signal)) score += 1;
+  }
+
+  for (const signal of machineSignals) {
+    if (text.includes(signal)) score -= 2;
+  }
+
+  const shortNaturalMessage =
+    body.length > 0 && body.length < 500 && /[?.!]/.test(body);
+  if (shortNaturalMessage) score += 1;
+
+  const hasRealQuestion =
+    text.includes("?") ||
+    text.includes("pouvez-vous") ||
+    text.includes("pourriez-vous") ||
+    text.includes("can you") ||
+    text.includes("could you");
+
+  if (hasRealQuestion) score += 2;
+
+  return {
+    isHuman: score > 0,
+    score,
+  };
+}
+
 function heuristicClassifyEmail(
   from: string,
   subject: string,
@@ -205,11 +298,26 @@ function heuristicClassifyEmail(
     haystack.includes(pattern)
   );
 
+  const humanCheck = isHumanLikeEmail(from, subject, body, snippet);
+
   if (hasReplySignal) priorityScore += 60;
   if (hasImportantInfo) priorityScore += 35;
   if (hasTransactional) priorityScore += 15;
   if (hasPromotional) priorityScore -= 60;
   if (hasNoReply) priorityScore -= 40;
+  if (humanCheck.isHuman) priorityScore += 15;
+  if (!humanCheck.isHuman) priorityScore -= 30;
+
+  if (!humanCheck.isHuman && !hasReplySignal && !hasImportantInfo) {
+    return {
+      category: "ignore",
+      needsReply: false,
+      priorityScore: Math.max(priorityScore, 0),
+      confidence: 0.82,
+      reason: "Detected as automated or low human-intent email",
+      suggestedAction: "ignore",
+    };
+  }
 
   if (hasPromotional && !hasReplySignal) {
     return {
@@ -238,8 +346,10 @@ function heuristicClassifyEmail(
       category: "reply_needed",
       needsReply: true,
       priorityScore: Math.min(priorityScore, 100),
-      confidence: 0.74,
-      reason: "Direct question or explicit reply intent detected",
+      confidence: humanCheck.isHuman ? 0.8 : 0.74,
+      reason: humanCheck.isHuman
+        ? "Human-like message with direct reply intent detected"
+        : "Direct question or explicit reply intent detected",
       suggestedAction: "reply",
     };
   }
@@ -271,7 +381,9 @@ function heuristicClassifyEmail(
     needsReply: false,
     priorityScore: Math.max(priorityScore, 0),
     confidence: 0.55,
-    reason: "No clear reply intent detected",
+    reason: humanCheck.isHuman
+      ? "Human-like email but no clear reply intent detected"
+      : "No clear reply intent detected",
     suggestedAction: "ignore",
   };
 }
@@ -308,6 +420,7 @@ Rules:
 - transactional = system/order/invoice/receipt-like message
 - promotional = newsletter, marketing, commercial campaign
 - ignore = low-value system noise or irrelevant message
+- give extra attention to whether this looks like a real human message or not
 
 Priority score must be between 0 and 100.
 Confidence must be between 0 and 1.
@@ -386,7 +499,10 @@ Body: ${input.body.slice(0, 1500)}
     return {
       category: parsed.category,
       needsReply: Boolean(parsed.needsReply),
-      priorityScore: Math.max(0, Math.min(100, Number(parsed.priorityScore) || 0)),
+      priorityScore: Math.max(
+        0,
+        Math.min(100, Number(parsed.priorityScore) || 0)
+      ),
       confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
       reason: String(parsed.reason || "AI classification"),
       suggestedAction: parsed.suggestedAction,
@@ -512,4 +628,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-        }
+  }
