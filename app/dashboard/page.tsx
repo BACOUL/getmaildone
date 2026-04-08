@@ -9,7 +9,12 @@ type GmailMessage = {
   from: string;
   snippet: string;
   body: string;
-  category: "reply_needed" | "important_info" | "transactional" | "promotional" | "ignore";
+  category:
+    | "reply_needed"
+    | "important_info"
+    | "transactional"
+    | "promotional"
+    | "ignore";
   needsReply: boolean;
   priorityScore: number;
   confidence: number;
@@ -40,6 +45,8 @@ export default function DashboardPage() {
 
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [replyLoadingId, setReplyLoadingId] = useState<string | null>(null);
+  const [sendLoadingId, setSendLoadingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Record<string, boolean>>({});
 
   const loadEmails = async () => {
     try {
@@ -122,6 +129,50 @@ export default function DashboardPage() {
       setError(err?.message || "Failed to generate reply");
     } finally {
       setReplyLoadingId(null);
+    }
+  };
+
+  const sendReply = async (email: GmailMessage) => {
+    try {
+      const reply = replies[email.id];
+
+      if (!reply || !reply.trim()) {
+        throw new Error("No reply to send");
+      }
+
+      setSendLoadingId(email.id);
+      setError("");
+
+      const emailMatch = email.from.match(/<(.+?)>/);
+      const to = emailMatch ? emailMatch[1] : email.from.trim();
+
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to,
+          subject: email.subject,
+          reply: reply.trim(),
+          threadId: email.threadId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to send reply");
+      }
+
+      setSentIds((prev) => ({
+        ...prev,
+        [email.id]: true,
+      }));
+    } catch (err: any) {
+      setError(err?.message || "Failed to send reply");
+    } finally {
+      setSendLoadingId(null);
     }
   };
 
@@ -299,6 +350,8 @@ export default function DashboardPage() {
 
           {emails.map((email) => {
             const categoryColors = getCategoryColors(email.category);
+            const hasReply = Boolean(replies[email.id]);
+            const isSent = Boolean(sentIds[email.id]);
 
             return (
               <article
@@ -340,7 +393,9 @@ export default function DashboardPage() {
                       padding: "6px 10px",
                       borderRadius: "999px",
                       background: email.needsReply ? "#dcfce7" : "#f1f5f9",
-                      border: `1px solid ${email.needsReply ? "#86efac" : "#cbd5e1"}`,
+                      border: `1px solid ${
+                        email.needsReply ? "#86efac" : "#cbd5e1"
+                      }`,
                       color: email.needsReply ? "#166534" : "#475569",
                       fontSize: "12px",
                       fontWeight: 700,
@@ -376,6 +431,22 @@ export default function DashboardPage() {
                   >
                     Confidence {Math.round(email.confidence * 100)}%
                   </span>
+
+                  {isSent ? (
+                    <span
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "999px",
+                        background: "#dcfce7",
+                        border: "1px solid #86efac",
+                        color: "#166534",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Sent
+                    </span>
+                  ) : null}
                 </div>
 
                 <p
@@ -502,17 +573,20 @@ export default function DashboardPage() {
                       border: "none",
                       fontWeight: 700,
                       fontSize: "14px",
-                      cursor: replyLoadingId === email.id ? "default" : "pointer",
+                      cursor:
+                        replyLoadingId === email.id ? "default" : "pointer",
                       opacity: replyLoadingId === email.id ? 0.7 : 1,
                       width: "100%",
                       maxWidth: "220px",
                     }}
                   >
-                    {replyLoadingId === email.id ? "Generating..." : "Generate reply"}
+                    {replyLoadingId === email.id
+                      ? "Generating..."
+                      : "Generate reply"}
                   </button>
                 ) : null}
 
-                {replies[email.id] ? (
+                {hasReply ? (
                   <div
                     style={{
                       marginBottom: "16px",
@@ -537,18 +611,82 @@ export default function DashboardPage() {
                       AI Reply
                     </p>
 
-                    <p
+                    <textarea
+                      value={replies[email.id]}
+                      onChange={(e) =>
+                        setReplies((prev) => ({
+                          ...prev,
+                          [email.id]: e.target.value,
+                        }))
+                      }
                       style={{
-                        margin: 0,
-                        fontSize: "15px",
-                        lineHeight: 1.7,
+                        width: "100%",
+                        minHeight: "140px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                        padding: "12px",
+                        fontSize: "14px",
+                        lineHeight: 1.6,
+                        fontFamily: "inherit",
                         color: "#0f172a",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
+                        background: "#ffffff",
+                        boxSizing: "border-box",
+                        resize: "vertical",
+                      }}
+                    />
+
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "10px",
+                        marginTop: "12px",
                       }}
                     >
-                      {replies[email.id]}
-                    </p>
+                      <button
+                        onClick={() =>
+                          navigator.clipboard.writeText(replies[email.id])
+                        }
+                        style={{
+                          padding: "10px 16px",
+                          borderRadius: "999px",
+                          background: "#0f172a",
+                          color: "#ffffff",
+                          border: "none",
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Copy reply
+                      </button>
+
+                      <button
+                        onClick={() => sendReply(email)}
+                        disabled={sendLoadingId === email.id || isSent}
+                        style={{
+                          padding: "10px 16px",
+                          borderRadius: "999px",
+                          background: "#16a34a",
+                          color: "#ffffff",
+                          border: "none",
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          cursor:
+                            sendLoadingId === email.id || isSent
+                              ? "default"
+                              : "pointer",
+                          opacity:
+                            sendLoadingId === email.id || isSent ? 0.7 : 1,
+                        }}
+                      >
+                        {isSent
+                          ? "Sent"
+                          : sendLoadingId === email.id
+                          ? "Sending..."
+                          : "Send reply"}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
@@ -583,4 +721,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-        }
+                }
