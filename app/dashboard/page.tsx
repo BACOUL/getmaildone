@@ -82,25 +82,28 @@ export default function DashboardPage() {
     <main
       style={{
         minHeight: "100vh",
-        padding: "40px",
+        padding: "20px",
         background: "#f8fafc",
         color: "#0f172a",
         fontFamily: "Arial, Helvetica, sans-serif",
+        display: "flex",
+        justifyContent: "center",
       }}
     >
       <div
         style={{
+          width: "100%",
           maxWidth: "900px",
-          margin: "0 auto",
         }}
       >
         <h1
           style={{
             marginTop: 0,
             marginBottom: "12px",
-            fontSize: "48px",
+            fontSize: "clamp(32px, 6vw, 48px)",
             lineHeight: 1.1,
             fontWeight: 800,
+            wordBreak: "break-word",
           }}
         >
           Dashboard
@@ -144,6 +147,8 @@ export default function DashboardPage() {
             fontSize: "16px",
             cursor: loading ? "default" : "pointer",
             opacity: loading ? 0.7 : 1,
+            width: "100%",
+            maxWidth: "220px",
           }}
         >
           {loading ? "Loading..." : "Load Emails"}
@@ -158,6 +163,7 @@ export default function DashboardPage() {
               background: "#fee2e2",
               color: "#991b1b",
               border: "1px solid #fecaca",
+              wordBreak: "break-word",
             }}
           >
             {error}
@@ -179,6 +185,7 @@ export default function DashboardPage() {
                 background: "#ffffff",
                 border: "1px solid #e2e8f0",
                 color: "#475569",
+                width: "100%",
               }}
             >
               No emails loaded yet.
@@ -194,6 +201,8 @@ export default function DashboardPage() {
                 borderRadius: "16px",
                 padding: "18px",
                 boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+                width: "100%",
+                wordBreak: "break-word",
               }}
             >
               <p
@@ -215,6 +224,7 @@ export default function DashboardPage() {
                   marginBottom: "8px",
                   fontSize: "15px",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
                 }}
               >
                 <strong>From:</strong> {email.from || "Unknown sender"}
@@ -226,6 +236,7 @@ export default function DashboardPage() {
                   marginBottom: "8px",
                   fontSize: "15px",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
                 }}
               >
                 <strong>Subject:</strong> {email.subject || "(No subject)"}
@@ -239,6 +250,7 @@ export default function DashboardPage() {
                   lineHeight: 1.6,
                   color: "#475569",
                   whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
                 }}
               >
                 {email.snippet || "No preview available."}
@@ -252,6 +264,7 @@ export default function DashboardPage() {
                     borderRadius: "12px",
                     background: "#f8fafc",
                     border: "1px solid #e2e8f0",
+                    width: "100%",
                   }}
                 >
                   <p
@@ -275,6 +288,7 @@ export default function DashboardPage() {
                       lineHeight: 1.7,
                       color: "#334155",
                       whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
                     }}
                   >
                     {email.body}
@@ -297,6 +311,8 @@ export default function DashboardPage() {
                   fontSize: "14px",
                   cursor: replyLoadingId === email.id ? "default" : "pointer",
                   opacity: replyLoadingId === email.id ? 0.7 : 1,
+                  width: "100%",
+                  maxWidth: "220px",
                 }}
               >
                 {replyLoadingId === email.id ? "Generating..." : "Generate reply"}
@@ -310,6 +326,7 @@ export default function DashboardPage() {
                     borderRadius: "12px",
                     background: "#eef6ff",
                     border: "1px solid #bfdbfe",
+                    width: "100%",
                   }}
                 >
                   <p
@@ -333,6 +350,7 @@ export default function DashboardPage() {
                       lineHeight: 1.7,
                       color: "#0f172a",
                       whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
                     }}
                   >
                     {replies[email.id]}
@@ -347,6 +365,7 @@ export default function DashboardPage() {
                   fontSize: "13px",
                   lineHeight: 1.6,
                   color: "#64748b",
+                  wordBreak: "break-word",
                 }}
               >
                 <strong>ID:</strong> {email.id}
@@ -358,6 +377,7 @@ export default function DashboardPage() {
                   fontSize: "13px",
                   lineHeight: 1.6,
                   color: "#64748b",
+                  wordBreak: "break-word",
                 }}
               >
                 <strong>Thread ID:</strong> {email.threadId}
@@ -368,4 +388,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-      }
+            }
