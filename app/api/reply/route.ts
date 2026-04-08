@@ -21,6 +21,16 @@ type ReplyVariant = {
   text: string;
 };
 
+type ThreadMessage = {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+};
+
 function buildStyleInstructions(styleProfile?: StyleProfile) {
   if (!styleProfile) {
     return `
@@ -64,7 +74,11 @@ Important:
 function normalizeReplies(raw: any): ReplyVariant[] {
   if (!Array.isArray(raw)) return [];
 
-  const validTypes: Array<ReplyVariant["type"]> = ["short", "balanced", "detailed"];
+  const validTypes: Array<ReplyVariant["type"]> = [
+    "short",
+    "balanced",
+    "detailed",
+  ];
 
   const cleaned = raw
     .map((item) => {
@@ -78,6 +92,7 @@ function normalizeReplies(raw: any): ReplyVariant[] {
     .filter(Boolean) as ReplyVariant[];
 
   const byType = new Map<ReplyVariant["type"], ReplyVariant>();
+
   for (const reply of cleaned) {
     if (!byType.has(reply.type)) {
       byType.set(reply.type, reply);
@@ -87,6 +102,26 @@ function normalizeReplies(raw: any): ReplyVariant[] {
   return validTypes
     .map((type) => byType.get(type))
     .filter(Boolean) as ReplyVariant[];
+}
+
+function formatThreadForPrompt(thread: ThreadMessage[]) {
+  if (!thread.length) {
+    return "No previous thread context available.";
+  }
+
+  return thread
+    .map((message, index) => {
+      const safeBody = (message.body || message.snippet || "").slice(0, 1200);
+
+      return `
+Message ${index + 1}
+From: ${message.from || "Unknown sender"}
+Subject: ${message.subject || "(No subject)"}
+Date: ${message.date || "Unknown date"}
+Content: ${safeBody}
+`.trim();
+    })
+    .join("\n\n---\n\n");
 }
 
 export async function POST(request: NextRequest) {
@@ -99,6 +134,7 @@ export async function POST(request: NextRequest) {
       needsReply,
       suggestedAction,
       styleProfile,
+      threadId,
     } = await request.json();
 
     if (!subject || !body) {
@@ -109,10 +145,18 @@ export async function POST(request: NextRequest) {
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     if (!apiKey) {
       return NextResponse.json(
         { error: "Missing OPENAI_API_KEY" },
+        { status: 500 }
+      );
+    }
+
+    if (!appUrl) {
+      return NextResponse.json(
+        { error: "Missing NEXT_PUBLIC_APP_URL" },
         { status: 500 }
       );
     }
@@ -125,7 +169,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    let thread: ThreadMessage[] = [];
+
+    if (threadId) {
+      try {
+        const threadResponse = await fetch(`${appUrl}/api/thread`, {
+          method: "POST",
+          headers: {
+            Cookie: request.headers.get("cookie") || "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ threadId }),
+          cache: "no-store",
+        });
+
+        const threadData = await threadResponse.json();
+
+        if (threadResponse.ok && Array.isArray(threadData?.thread)) {
+          thread = threadData.thread;
+        }
+      } catch {
+        thread = [];
+      }
+    }
+
     const styleInstructions = buildStyleInstructions(styleProfile);
+    const threadContext = formatThreadForPrompt(thread);
 
     const prompt = `
 You are helping a user reply to an email.
@@ -138,8 +207,11 @@ Email metadata:
 - Category: ${category || "unknown"}
 - Suggested action: ${suggestedAction || "unknown"}
 
-Email body:
+Current email body:
 ${body}
+
+Conversation thread context:
+${threadContext}
 
 Your task:
 Generate 3 realistic reply options that the user could actually send.
@@ -149,7 +221,9 @@ Reply types:
 2. balanced = best default option, natural and practical
 3. detailed = more complete, more reassuring, still human
 
-Rules:
+Critical rules:
+- Use the thread context to avoid repeating or contradicting previous messages
+- If the user already answered something in the thread, stay consistent with it
 - Return STRICT JSON only
 - Do not mention AI
 - Do not explain your reasoning
@@ -177,7 +251,7 @@ Expected JSON format:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.4,
+        temperature: 0.35,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -212,6 +286,7 @@ Expected JSON format:
     }
 
     let parsed: any;
+
     try {
       parsed = JSON.parse(content);
     } catch {
@@ -232,6 +307,8 @@ Expected JSON format:
 
     return NextResponse.json({
       replies,
+      threadUsed: thread.length > 0,
+      threadMessageCount: thread.length,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -239,4 +316,4 @@ Expected JSON format:
       { status: 500 }
     );
   }
-      }
+}
