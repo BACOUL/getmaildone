@@ -2,6 +2,49 @@ import { cookies } from "next/headers";
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
 
+function decodeHtml(value: string) {
+  return value
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function decodeBase64Url(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  return Buffer.from(normalized, "base64").toString("utf-8");
+}
+
+function extractBodyFromPayload(payload: any): string {
+  if (!payload) return "";
+
+  if (payload.body?.data) {
+    return decodeBase64Url(payload.body.data);
+  }
+
+  if (Array.isArray(payload.parts)) {
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/plain" && part.body?.data) {
+        return decodeBase64Url(part.body.data);
+      }
+    }
+
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/html" && part.body?.data) {
+        return decodeBase64Url(part.body.data);
+      }
+    }
+
+    for (const part of payload.parts) {
+      const nested = extractBodyFromPayload(part);
+      if (nested) return nested;
+    }
+  }
+
+  return "";
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -24,7 +67,6 @@ export async function GET() {
       auth: oauth2Client,
     });
 
-    // 1. Liste des messages
     const list = await gmail.users.messages.list({
       userId: "me",
       maxResults: 5,
@@ -32,12 +74,12 @@ export async function GET() {
 
     const messages = list.data.messages || [];
 
-    // 2. Détail de chaque message
     const detailedMessages = await Promise.all(
       messages.map(async (msg) => {
         const full = await gmail.users.messages.get({
           userId: "me",
           id: msg.id!,
+          format: "full",
         });
 
         const headers = full.data.payload?.headers || [];
@@ -48,12 +90,16 @@ export async function GET() {
         const from =
           headers.find((h) => h.name === "From")?.value || "";
 
+        const rawBody = extractBodyFromPayload(full.data.payload);
+        const cleanedBody = decodeHtml(rawBody).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
         return {
           id: msg.id,
           threadId: msg.threadId,
-          subject,
-          from,
-          snippet: full.data.snippet,
+          subject: decodeHtml(subject),
+          from: decodeHtml(from),
+          snippet: decodeHtml(full.data.snippet || ""),
+          body: cleanedBody,
         };
       })
     );
