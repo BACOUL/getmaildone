@@ -9,6 +9,12 @@ type GmailMessage = {
   from: string;
   snippet: string;
   body: string;
+  category: "reply_needed" | "important_info" | "transactional" | "promotional" | "ignore";
+  needsReply: boolean;
+  priorityScore: number;
+  confidence: number;
+  reason: string;
+  suggestedAction: "reply" | "read" | "archive" | "ignore";
 };
 
 export default function DashboardPage() {
@@ -78,6 +84,64 @@ export default function DashboardPage() {
     }
   };
 
+  const getCategoryLabel = (category: GmailMessage["category"]) => {
+    switch (category) {
+      case "reply_needed":
+        return "Reply needed";
+      case "important_info":
+        return "Important info";
+      case "transactional":
+        return "Transactional";
+      case "promotional":
+        return "Promotional";
+      case "ignore":
+        return "Ignore";
+      default:
+        return category;
+    }
+  };
+
+  const getCategoryColors = (category: GmailMessage["category"]) => {
+    switch (category) {
+      case "reply_needed":
+        return {
+          bg: "#dcfce7",
+          border: "#86efac",
+          text: "#166534",
+        };
+      case "important_info":
+        return {
+          bg: "#dbeafe",
+          border: "#93c5fd",
+          text: "#1d4ed8",
+        };
+      case "transactional":
+        return {
+          bg: "#f3f4f6",
+          border: "#d1d5db",
+          text: "#374151",
+        };
+      case "promotional":
+        return {
+          bg: "#fef3c7",
+          border: "#fcd34d",
+          text: "#92400e",
+        };
+      case "ignore":
+        return {
+          bg: "#fee2e2",
+          border: "#fca5a5",
+          text: "#991b1b",
+        };
+      default:
+        return {
+          bg: "#f1f5f9",
+          border: "#cbd5e1",
+          text: "#334155",
+        };
+    }
+  };
+
   return (
     <main
       style={{
@@ -129,7 +193,7 @@ export default function DashboardPage() {
             color: "#334155",
           }}
         >
-          Load your Gmail messages and generate replies below.
+          Load your Gmail messages and identify what actually needs a reply.
         </p>
 
         <button
@@ -192,200 +256,290 @@ export default function DashboardPage() {
             </div>
           ) : null}
 
-          {emails.map((email) => (
-            <article
-              key={email.id}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "16px",
-                padding: "18px",
-                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-                width: "100%",
-                wordBreak: "break-word",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "14px",
-                  color: "#64748b",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  fontWeight: 700,
-                }}
-              >
-                Message
-              </p>
+          {emails.map((email) => {
+            const categoryColors = getCategoryColors(email.category);
 
-              <p
+            return (
+              <article
+                key={email.id}
                 style={{
-                  marginTop: "12px",
-                  marginBottom: "8px",
-                  fontSize: "15px",
-                  lineHeight: 1.6,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "16px",
+                  padding: "18px",
+                  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+                  width: "100%",
                   wordBreak: "break-word",
                 }}
               >
-                <strong>From:</strong> {email.from || "Unknown sender"}
-              </p>
-
-              <p
-                style={{
-                  marginTop: 0,
-                  marginBottom: "8px",
-                  fontSize: "15px",
-                  lineHeight: 1.6,
-                  wordBreak: "break-word",
-                }}
-              >
-                <strong>Subject:</strong> {email.subject || "(No subject)"}
-              </p>
-
-              <p
-                style={{
-                  marginTop: 0,
-                  marginBottom: "14px",
-                  fontSize: "15px",
-                  lineHeight: 1.6,
-                  color: "#475569",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {email.snippet || "No preview available."}
-              </p>
-
-              {email.body ? (
                 <div
                   style={{
-                    marginBottom: "16px",
-                    padding: "14px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      background: categoryColors.bg,
+                      border: `1px solid ${categoryColors.border}`,
+                      color: categoryColors.text,
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {getCategoryLabel(email.category)}
+                  </span>
+
+                  <span
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      background: email.needsReply ? "#dcfce7" : "#f1f5f9",
+                      border: `1px solid ${email.needsReply ? "#86efac" : "#cbd5e1"}`,
+                      color: email.needsReply ? "#166534" : "#475569",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {email.needsReply ? "Needs reply" : "No reply needed"}
+                  </span>
+
+                  <span
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      background: "#f8fafc",
+                      border: "1px solid #cbd5e1",
+                      color: "#334155",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Priority {email.priorityScore}
+                  </span>
+
+                  <span
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      background: "#f8fafc",
+                      border: "1px solid #cbd5e1",
+                      color: "#334155",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Confidence {Math.round(email.confidence * 100)}%
+                  </span>
+                </div>
+
+                <p
+                  style={{
+                    marginTop: "12px",
+                    marginBottom: "8px",
+                    fontSize: "15px",
+                    lineHeight: 1.6,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <strong>From:</strong> {email.from || "Unknown sender"}
+                </p>
+
+                <p
+                  style={{
+                    marginTop: 0,
+                    marginBottom: "8px",
+                    fontSize: "15px",
+                    lineHeight: 1.6,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <strong>Subject:</strong> {email.subject || "(No subject)"}
+                </p>
+
+                <p
+                  style={{
+                    marginTop: 0,
+                    marginBottom: "10px",
+                    fontSize: "15px",
+                    lineHeight: 1.6,
+                    color: "#475569",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {email.snippet || "No preview available."}
+                </p>
+
+                <div
+                  style={{
+                    marginBottom: "14px",
+                    padding: "12px 14px",
                     borderRadius: "12px",
                     background: "#f8fafc",
                     border: "1px solid #e2e8f0",
-                    width: "100%",
                   }}
                 >
                   <p
                     style={{
-                      marginTop: 0,
-                      marginBottom: "8px",
-                      fontSize: "13px",
-                      color: "#64748b",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Body
-                  </p>
-
-                  <p
-                    style={{
                       margin: 0,
-                      fontSize: "14px",
-                      lineHeight: 1.7,
+                      fontSize: "13px",
+                      lineHeight: 1.6,
                       color: "#334155",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
                     }}
                   >
-                    {email.body}
+                    <strong>Reason:</strong> {email.reason}
+                  </p>
+                  <p
+                    style={{
+                      marginTop: "6px",
+                      marginBottom: 0,
+                      fontSize: "13px",
+                      lineHeight: 1.6,
+                      color: "#334155",
+                    }}
+                  >
+                    <strong>Suggested action:</strong> {email.suggestedAction}
                   </p>
                 </div>
-              ) : null}
 
-              <button
-                onClick={() => generateReply(email)}
-                disabled={replyLoadingId === email.id}
-                style={{
-                  display: "inline-block",
-                  marginBottom: "16px",
-                  padding: "12px 18px",
-                  borderRadius: "999px",
-                  background: "#0f172a",
-                  color: "#ffffff",
-                  border: "none",
-                  fontWeight: 700,
-                  fontSize: "14px",
-                  cursor: replyLoadingId === email.id ? "default" : "pointer",
-                  opacity: replyLoadingId === email.id ? 0.7 : 1,
-                  width: "100%",
-                  maxWidth: "220px",
-                }}
-              >
-                {replyLoadingId === email.id ? "Generating..." : "Generate reply"}
-              </button>
+                {email.body ? (
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "14px",
+                      borderRadius: "12px",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      width: "100%",
+                    }}
+                  >
+                    <p
+                      style={{
+                        marginTop: 0,
+                        marginBottom: "8px",
+                        fontSize: "13px",
+                        color: "#64748b",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Body
+                    </p>
 
-              {replies[email.id] ? (
-                <div
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "14px",
+                        lineHeight: 1.7,
+                        color: "#334155",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {email.body}
+                    </p>
+                  </div>
+                ) : null}
+
+                {email.needsReply ? (
+                  <button
+                    onClick={() => generateReply(email)}
+                    disabled={replyLoadingId === email.id}
+                    style={{
+                      display: "inline-block",
+                      marginBottom: "16px",
+                      padding: "12px 18px",
+                      borderRadius: "999px",
+                      background: "#0f172a",
+                      color: "#ffffff",
+                      border: "none",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      cursor: replyLoadingId === email.id ? "default" : "pointer",
+                      opacity: replyLoadingId === email.id ? 0.7 : 1,
+                      width: "100%",
+                      maxWidth: "220px",
+                    }}
+                  >
+                    {replyLoadingId === email.id ? "Generating..." : "Generate reply"}
+                  </button>
+                ) : null}
+
+                {replies[email.id] ? (
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "14px",
+                      borderRadius: "12px",
+                      background: "#eef6ff",
+                      border: "1px solid #bfdbfe",
+                      width: "100%",
+                    }}
+                  >
+                    <p
+                      style={{
+                        marginTop: 0,
+                        marginBottom: "8px",
+                        fontSize: "13px",
+                        color: "#1d4ed8",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        fontWeight: 700,
+                      }}
+                    >
+                      AI Reply
+                    </p>
+
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "15px",
+                        lineHeight: 1.7,
+                        color: "#0f172a",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {replies[email.id]}
+                    </p>
+                  </div>
+                ) : null}
+
+                <p
                   style={{
-                    marginBottom: "16px",
-                    padding: "14px",
-                    borderRadius: "12px",
-                    background: "#eef6ff",
-                    border: "1px solid #bfdbfe",
-                    width: "100%",
+                    marginTop: 0,
+                    marginBottom: "6px",
+                    fontSize: "13px",
+                    lineHeight: 1.6,
+                    color: "#64748b",
+                    wordBreak: "break-word",
                   }}
                 >
-                  <p
-                    style={{
-                      marginTop: 0,
-                      marginBottom: "8px",
-                      fontSize: "13px",
-                      color: "#1d4ed8",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      fontWeight: 700,
-                    }}
-                  >
-                    AI Reply
-                  </p>
+                  <strong>ID:</strong> {email.id}
+                </p>
 
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "15px",
-                      lineHeight: 1.7,
-                      color: "#0f172a",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {replies[email.id]}
-                  </p>
-                </div>
-              ) : null}
-
-              <p
-                style={{
-                  marginTop: 0,
-                  marginBottom: "6px",
-                  fontSize: "13px",
-                  lineHeight: 1.6,
-                  color: "#64748b",
-                  wordBreak: "break-word",
-                }}
-              >
-                <strong>ID:</strong> {email.id}
-              </p>
-
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                  lineHeight: 1.6,
-                  color: "#64748b",
-                  wordBreak: "break-word",
-                }}
-              >
-                <strong>Thread ID:</strong> {email.threadId}
-              </p>
-            </article>
-          ))}
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "13px",
+                    lineHeight: 1.6,
+                    color: "#64748b",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <strong>Thread ID:</strong> {email.threadId}
+                </p>
+              </article>
+            );
+          })}
         </div>
       </div>
     </main>
   );
-            }
+                        }
