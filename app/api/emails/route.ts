@@ -2,6 +2,24 @@ import { cookies } from "next/headers";
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
 
+type EmailCategory =
+  | "reply_needed"
+  | "important_info"
+  | "transactional"
+  | "promotional"
+  | "ignore";
+
+type SuggestedAction = "reply" | "read" | "archive" | "ignore";
+
+type ClassificationResult = {
+  category: EmailCategory;
+  needsReply: boolean;
+  priorityScore: number;
+  confidence: number;
+  reason: string;
+  suggestedAction: SuggestedAction;
+};
+
 function decodeHtml(value: string) {
   return value
     .replace(/&#39;/g, "'")
@@ -63,27 +81,15 @@ function cleanEmailBody(text: string) {
   );
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
-  return cleaned.slice(0, 800);
+  return cleaned.slice(0, 1200);
 }
 
-type EmailCategory =
-  | "reply_needed"
-  | "important_info"
-  | "transactional"
-  | "promotional"
-  | "ignore";
-
-function classifyEmail(
+function heuristicClassifyEmail(
   from: string,
   subject: string,
   body: string,
   snippet: string
-): {
-  category: EmailCategory;
-  needsReply: boolean;
-  priorityScore: number;
-  reason: string;
-} {
+): ClassificationResult {
   const haystack = `${from} ${subject} ${body} ${snippet}`.toLowerCase();
 
   const promotionalPatterns = [
@@ -210,7 +216,9 @@ function classifyEmail(
       category: "promotional",
       needsReply: false,
       priorityScore: Math.max(priorityScore, 0),
+      confidence: 0.72,
       reason: "Promotional or newsletter-like email detected",
+      suggestedAction: "ignore",
     };
   }
 
@@ -219,7 +227,9 @@ function classifyEmail(
       category: "ignore",
       needsReply: false,
       priorityScore: Math.max(priorityScore, 0),
+      confidence: 0.8,
       reason: "No-reply or system notification detected",
+      suggestedAction: "ignore",
     };
   }
 
@@ -228,7 +238,9 @@ function classifyEmail(
       category: "reply_needed",
       needsReply: true,
       priorityScore: Math.min(priorityScore, 100),
+      confidence: 0.74,
       reason: "Direct question or explicit reply intent detected",
+      suggestedAction: "reply",
     };
   }
 
@@ -237,7 +249,9 @@ function classifyEmail(
       category: "transactional",
       needsReply: false,
       priorityScore: Math.min(priorityScore, 100),
+      confidence: 0.76,
       reason: "Transactional email detected",
+      suggestedAction: "archive",
     };
   }
 
@@ -246,7 +260,9 @@ function classifyEmail(
       category: "important_info",
       needsReply: false,
       priorityScore: Math.min(priorityScore, 100),
+      confidence: 0.68,
       reason: "Important informational email detected",
+      suggestedAction: "read",
     };
   }
 
@@ -254,8 +270,148 @@ function classifyEmail(
     category: "ignore",
     needsReply: false,
     priorityScore: Math.max(priorityScore, 0),
+    confidence: 0.55,
     reason: "No clear reply intent detected",
+    suggestedAction: "ignore",
   };
+}
+
+async function aiClassifyEmail(input: {
+  from: string;
+  subject: string;
+  body: string;
+  snippet: string;
+  heuristic: ClassificationResult;
+}): Promise<ClassificationResult | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const prompt = `
+Classify this email for a productivity assistant.
+
+Return STRICT JSON only with this exact shape:
+{
+  "category": "reply_needed" | "important_info" | "transactional" | "promotional" | "ignore",
+  "needsReply": boolean,
+  "priorityScore": number,
+  "confidence": number,
+  "reason": string,
+  "suggestedAction": "reply" | "read" | "archive" | "ignore"
+}
+
+Rules:
+- reply_needed = a human reply is likely expected
+- important_info = important to read, but no reply clearly needed
+- transactional = system/order/invoice/receipt-like message
+- promotional = newsletter, marketing, commercial campaign
+- ignore = low-value system noise or irrelevant message
+
+Priority score must be between 0 and 100.
+Confidence must be between 0 and 1.
+
+Heuristic result:
+${JSON.stringify(input.heuristic)}
+
+Email:
+From: ${input.from}
+Subject: ${input.subject}
+Snippet: ${input.snippet}
+Body: ${input.body.slice(0, 1500)}
+`;
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You classify emails for actionability. Return only valid JSON.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+
+  if (!content) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+
+    const validCategories: EmailCategory[] = [
+      "reply_needed",
+      "important_info",
+      "transactional",
+      "promotional",
+      "ignore",
+    ];
+
+    const validActions: SuggestedAction[] = [
+      "reply",
+      "read",
+      "archive",
+      "ignore",
+    ];
+
+    if (
+      !validCategories.includes(parsed.category) ||
+      !validActions.includes(parsed.suggestedAction)
+    ) {
+      return null;
+    }
+
+    return {
+      category: parsed.category,
+      needsReply: Boolean(parsed.needsReply),
+      priorityScore: Math.max(0, Math.min(100, Number(parsed.priorityScore) || 0)),
+      confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
+      reason: String(parsed.reason || "AI classification"),
+      suggestedAction: parsed.suggestedAction,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function mergeClassifications(
+  heuristic: ClassificationResult,
+  ai: ClassificationResult | null
+): ClassificationResult {
+  if (!ai) return heuristic;
+
+  const useAi =
+    ai.confidence >= 0.72 ||
+    (heuristic.category === "ignore" && ai.category === "reply_needed") ||
+    (heuristic.category === "promotional" && ai.category === "reply_needed");
+
+  if (!useAi) {
+    return heuristic;
+  }
+
+  return ai;
 }
 
 export async function GET() {
@@ -306,24 +462,39 @@ export async function GET() {
         const cleanedBody = cleanEmailBody(rawBody);
         const cleanedSnippet = decodeHtml(full.data.snippet || "");
 
-        const classification = classifyEmail(
-          from,
-          subject,
+        const safeSubject = decodeHtml(subject);
+        const safeFrom = decodeHtml(from);
+
+        const heuristic = heuristicClassifyEmail(
+          safeFrom,
+          safeSubject,
           cleanedBody,
           cleanedSnippet
         );
 
+        const ai = await aiClassifyEmail({
+          from: safeFrom,
+          subject: safeSubject,
+          body: cleanedBody,
+          snippet: cleanedSnippet,
+          heuristic,
+        });
+
+        const classification = mergeClassifications(heuristic, ai);
+
         return {
           id: msg.id,
           threadId: msg.threadId,
-          subject: decodeHtml(subject),
-          from: decodeHtml(from),
+          subject: safeSubject,
+          from: safeFrom,
           snippet: cleanedSnippet,
           body: cleanedBody,
           category: classification.category,
           needsReply: classification.needsReply,
           priorityScore: classification.priorityScore,
+          confidence: classification.confidence,
           reason: classification.reason,
+          suggestedAction: classification.suggestedAction,
         };
       })
     );
@@ -341,4 +512,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-          }
+        }
