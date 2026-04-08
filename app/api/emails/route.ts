@@ -57,27 +57,37 @@ function cleanEmailBody(text: string) {
   cleaned = cleaned.replace(/\S+@\S+\.\S+/g, " ");
   cleaned = cleaned.replace(/&nbsp;/gi, " ");
   cleaned = cleaned.replace(/\[image:.*?\]/gi, " ");
-  cleaned = cleaned.replace(/\b(?:facebook|instagram|twitter|linkedin|youtube|tiktok)\b/gi, " ");
+  cleaned = cleaned.replace(
+    /\b(?:facebook|instagram|twitter|linkedin|youtube|tiktok)\b/gi,
+    " "
+  );
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
-  return cleaned.slice(0, 500);
+  return cleaned.slice(0, 800);
 }
 
-function isUsefulEmail(from: string, subject: string, body: string, snippet: string) {
+type EmailCategory =
+  | "reply_needed"
+  | "important_info"
+  | "transactional"
+  | "promotional"
+  | "ignore";
+
+function classifyEmail(
+  from: string,
+  subject: string,
+  body: string,
+  snippet: string
+): {
+  category: EmailCategory;
+  needsReply: boolean;
+  priorityScore: number;
+  reason: string;
+} {
   const haystack = `${from} ${subject} ${body} ${snippet}`.toLowerCase();
 
-  const blockedPatterns = [
+  const promotionalPatterns = [
     "newsletter",
-    "noreply",
-    "no-reply",
-    "do-not-reply",
-    "donotreply",
-    "notification@",
-    "notifications@",
-    "mailchimp",
-    "sendgrid",
-    "hubspot",
-    "marketing",
     "promo",
     "promotion",
     "promotions",
@@ -88,61 +98,164 @@ function isUsefulEmail(from: string, subject: string, body: string, snippet: str
     "unsubscribe",
     "désabonner",
     "manage preferences",
-    "préférences",
     "view in browser",
     "voir dans le navigateur",
-    "privacy policy",
-    "politique de confidentialité",
-    "terms of service",
-    "conditions générales",
-    "receipts",
+    "mailchimp",
+    "hubspot",
+    "marketing",
+    "campaign",
+  ];
+
+  const transactionalPatterns = [
     "receipt",
-    "facture",
+    "receipts",
     "invoice",
+    "facture",
     "order confirmed",
     "commande confirmée",
     "shipping confirmation",
-    "expédiée",
-    "expedition",
     "tracking number",
     "numéro de suivi",
-    "indeed for employers",
-    "orchestra",
-    "support@",
-    "contact@",
+    "your order",
+    "votre commande",
+    "payment received",
+    "paiement reçu",
+    "password reset",
+    "réinitialisation",
+    "security alert",
   ];
 
-  const positivePatterns = [
-    "bonjour",
-    "hello",
-    "hi ",
-    "salut",
-    "merci",
-    "question",
-    "rendez-vous",
-    "meeting",
-    "disponible",
-    "available",
+  const autoNoReplyPatterns = [
+    "noreply",
+    "no-reply",
+    "do-not-reply",
+    "donotreply",
+    "notification@",
+    "notifications@",
+  ];
+
+  const replySignals = [
+    "?",
     "pouvez-vous",
+    "pourriez-vous",
+    "merci de",
+    "merci par avance",
+    "can you",
     "could you",
     "please",
+    "let me know",
+    "available",
+    "disponible",
+    "price",
     "prix",
-    "taille",
-    "spa",
-    "message",
+    "still available",
+    "toujours disponible",
+    "i am interested",
+    "je suis intéressé",
+    "je suis interesse",
+    "when can",
+    "quand pouvez-vous",
+    "rendez-vous",
+    "meeting",
+    "call me",
+    "appelez-moi",
+    "répondez-moi",
     "reply",
-    "répondre",
     "leboncoin",
+    "marketplace",
   ];
 
-  const isBlocked = blockedPatterns.some((pattern) => haystack.includes(pattern));
-  const isPositive = positivePatterns.some((pattern) => haystack.includes(pattern));
+  const importantInfoSignals = [
+    "confirmed",
+    "confirmé",
+    "confirmed booking",
+    "reservation",
+    "rappel",
+    "appointment",
+    "meeting scheduled",
+    "payment",
+    "virement",
+    "contract",
+    "contrat",
+    "document attached",
+    "pièce jointe",
+  ];
 
-  if (isBlocked && !isPositive) {
-    return false;
+  let priorityScore = 0;
+
+  const hasPromotional = promotionalPatterns.some((pattern) =>
+    haystack.includes(pattern)
+  );
+  const hasTransactional = transactionalPatterns.some((pattern) =>
+    haystack.includes(pattern)
+  );
+  const hasNoReply = autoNoReplyPatterns.some((pattern) =>
+    haystack.includes(pattern)
+  );
+  const hasReplySignal = replySignals.some((pattern) =>
+    haystack.includes(pattern)
+  );
+  const hasImportantInfo = importantInfoSignals.some((pattern) =>
+    haystack.includes(pattern)
+  );
+
+  if (hasReplySignal) priorityScore += 60;
+  if (hasImportantInfo) priorityScore += 35;
+  if (hasTransactional) priorityScore += 15;
+  if (hasPromotional) priorityScore -= 60;
+  if (hasNoReply) priorityScore -= 40;
+
+  if (hasPromotional && !hasReplySignal) {
+    return {
+      category: "promotional",
+      needsReply: false,
+      priorityScore: Math.max(priorityScore, 0),
+      reason: "Promotional or newsletter-like email detected",
+    };
   }
 
-  return true;
+  if (hasNoReply && !hasReplySignal) {
+    return {
+      category: "ignore",
+      needsReply: false,
+      priorityScore: Math.max(priorityScore, 0),
+      reason: "No-reply or system notification detected",
+    };
+  }
+
+  if (hasReplySignal) {
+    return {
+      category: "reply_needed",
+      needsReply: true,
+      priorityScore: Math.min(priorityScore, 100),
+      reason: "Direct question or explicit reply intent detected",
+    };
+  }
+
+  if (hasTransactional) {
+    return {
+      category: "transactional",
+      needsReply: false,
+      priorityScore: Math.min(priorityScore, 100),
+      reason: "Transactional email detected",
+    };
+  }
+
+  if (hasImportantInfo) {
+    return {
+      category: "important_info",
+      needsReply: false,
+      priorityScore: Math.min(priorityScore, 100),
+      reason: "Important informational email detected",
+    };
+  }
+
+  return {
+    category: "ignore",
+    needsReply: false,
+    priorityScore: Math.max(priorityScore, 0),
+    reason: "No clear reply intent detected",
+  };
 }
 
 export async function GET() {
@@ -169,7 +282,7 @@ export async function GET() {
 
     const list = await gmail.users.messages.list({
       userId: "me",
-      maxResults: 15,
+      maxResults: 30,
     });
 
     const messages = list.data.messages || [];
@@ -187,16 +300,18 @@ export async function GET() {
         const subject =
           headers.find((h) => h.name === "Subject")?.value || "";
 
-        const from =
-          headers.find((h) => h.name === "From")?.value || "";
+        const from = headers.find((h) => h.name === "From")?.value || "";
 
         const rawBody = extractBodyFromPayload(full.data.payload);
         const cleanedBody = cleanEmailBody(rawBody);
         const cleanedSnippet = decodeHtml(full.data.snippet || "");
 
-        if (!isUsefulEmail(from, subject, cleanedBody, cleanedSnippet)) {
-          return null;
-        }
+        const classification = classifyEmail(
+          from,
+          subject,
+          cleanedBody,
+          cleanedSnippet
+        );
 
         return {
           id: msg.id,
@@ -205,12 +320,20 @@ export async function GET() {
           from: decodeHtml(from),
           snippet: cleanedSnippet,
           body: cleanedBody,
+          category: classification.category,
+          needsReply: classification.needsReply,
+          priorityScore: classification.priorityScore,
+          reason: classification.reason,
         };
       })
     );
 
+    const sortedMessages = detailedMessages
+      .sort((a, b) => b.priorityScore - a.priorityScore)
+      .slice(0, 10);
+
     return NextResponse.json({
-      messages: detailedMessages.filter(Boolean).slice(0, 5),
+      messages: sortedMessages,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -218,4 +341,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-    }
+          }
