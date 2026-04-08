@@ -5,6 +5,9 @@ import { useState } from "react";
 type GmailMessage = {
   id: string;
   threadId: string;
+  subject: string;
+  from: string;
+  snippet: string;
 };
 
 export default function DashboardPage() {
@@ -170,10 +173,45 @@ export default function DashboardPage() {
 
               <p
                 style={{
-                  marginTop: "10px",
+                  marginTop: "12px",
                   marginBottom: "8px",
                   fontSize: "15px",
                   lineHeight: 1.6,
+                }}
+              >
+                <strong>From:</strong> {email.from || "Unknown sender"}
+              </p>
+
+              <p
+                style={{
+                  marginTop: 0,
+                  marginBottom: "8px",
+                  fontSize: "15px",
+                  lineHeight: 1.6,
+                }}
+              >
+                <strong>Subject:</strong> {email.subject || "(No subject)"}
+              </p>
+
+              <p
+                style={{
+                  marginTop: 0,
+                  marginBottom: "14px",
+                  fontSize: "15px",
+                  lineHeight: 1.6,
+                  color: "#475569",
+                }}
+              >
+                {email.snippet || "No preview available."}
+              </p>
+
+              <p
+                style={{
+                  marginTop: 0,
+                  marginBottom: "6px",
+                  fontSize: "13px",
+                  lineHeight: 1.6,
+                  color: "#64748b",
                 }}
               >
                 <strong>ID:</strong> {email.id}
@@ -182,8 +220,9 @@ export default function DashboardPage() {
               <p
                 style={{
                   margin: 0,
-                  fontSize: "15px",
+                  fontSize: "13px",
                   lineHeight: 1.6,
+                  color: "#64748b",
                 }}
               >
                 <strong>Thread ID:</strong> {email.threadId}
