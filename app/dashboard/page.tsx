@@ -38,12 +38,20 @@ type StyleProfile = {
   sampleCount?: number;
 };
 
+type ReplyVariant = {
+  type: "short" | "balanced" | "detailed";
+  text: string;
+};
+
 export default function DashboardPage() {
   const [emails, setEmails] = useState<GmailMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
-  const [replies, setReplies] = useState<Record<string, string>>({});
+  const [replies, setReplies] = useState<Record<string, ReplyVariant[]>>({});
+  const [selectedReplies, setSelectedReplies] = useState<Record<string, string>>(
+    {}
+  );
   const [replyLoadingId, setReplyLoadingId] = useState<string | null>(null);
   const [sendLoadingId, setSendLoadingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Record<string, boolean>>({});
@@ -110,23 +118,38 @@ export default function DashboardPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to generate reply");
+        throw new Error(data?.error || "Failed to generate replies");
       }
 
       if (data?.skipped) {
         setReplies((prev) => ({
+          ...prev,
+          [email.id]: [],
+        }));
+        setSelectedReplies((prev) => ({
           ...prev,
           [email.id]: data?.reason || "No reply needed.",
         }));
         return;
       }
 
+      const generatedReplies: ReplyVariant[] = data?.replies || [];
+
       setReplies((prev) => ({
         ...prev,
-        [email.id]: data?.reply || "",
+        [email.id]: generatedReplies,
+      }));
+
+      const balanced =
+        generatedReplies.find((reply) => reply.type === "balanced") ||
+        generatedReplies[0];
+
+      setSelectedReplies((prev) => ({
+        ...prev,
+        [email.id]: balanced?.text || "",
       }));
     } catch (err: any) {
-      setError(err?.message || "Failed to generate reply");
+      setError(err?.message || "Failed to generate replies");
     } finally {
       setReplyLoadingId(null);
     }
@@ -134,7 +157,7 @@ export default function DashboardPage() {
 
   const sendReply = async (email: GmailMessage) => {
     try {
-      const reply = replies[email.id];
+      const reply = selectedReplies[email.id];
 
       if (!reply || !reply.trim()) {
         throw new Error("No reply to send");
@@ -231,6 +254,19 @@ export default function DashboardPage() {
           border: "#cbd5e1",
           text: "#334155",
         };
+    }
+  };
+
+  const getReplyTypeLabel = (type: ReplyVariant["type"]) => {
+    switch (type) {
+      case "short":
+        return "Short";
+      case "balanced":
+        return "Balanced";
+      case "detailed":
+        return "Detailed";
+      default:
+        return type;
     }
   };
 
@@ -350,7 +386,9 @@ export default function DashboardPage() {
 
           {emails.map((email) => {
             const categoryColors = getCategoryColors(email.category);
-            const hasReply = Boolean(replies[email.id]);
+            const emailReplies = replies[email.id] || [];
+            const selectedReply = selectedReplies[email.id] || "";
+            const hasReply = Boolean(selectedReply);
             const isSent = Boolean(sentIds[email.id]);
 
             return (
@@ -582,8 +620,95 @@ export default function DashboardPage() {
                   >
                     {replyLoadingId === email.id
                       ? "Generating..."
-                      : "Generate reply"}
+                      : "Generate replies"}
                   </button>
+                ) : null}
+
+                {emailReplies.length > 0 ? (
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      display: "grid",
+                      gap: "10px",
+                    }}
+                  >
+                    {emailReplies.map((replyOption) => {
+                      const isSelected =
+                        selectedReplies[email.id] === replyOption.text;
+
+                      return (
+                        <div
+                          key={replyOption.type}
+                          style={{
+                            padding: "14px",
+                            borderRadius: "12px",
+                            background: isSelected ? "#eef6ff" : "#ffffff",
+                            border: isSelected
+                              ? "1px solid #60a5fa"
+                              : "1px solid #cbd5e1",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "10px",
+                              marginBottom: "10px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "13px",
+                                color: isSelected ? "#1d4ed8" : "#334155",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.04em",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {getReplyTypeLabel(replyOption.type)}
+                            </p>
+
+                            <button
+                              onClick={() =>
+                                setSelectedReplies((prev) => ({
+                                  ...prev,
+                                  [email.id]: replyOption.text,
+                                }))
+                              }
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "999px",
+                                background: isSelected ? "#1d4ed8" : "#0f172a",
+                                color: "#ffffff",
+                                border: "none",
+                                fontWeight: 700,
+                                fontSize: "12px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {isSelected ? "Selected" : "Use this reply"}
+                            </button>
+                          </div>
+
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "15px",
+                              lineHeight: 1.7,
+                              color: "#0f172a",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {replyOption.text}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : null}
 
                 {hasReply ? (
@@ -608,13 +733,13 @@ export default function DashboardPage() {
                         fontWeight: 700,
                       }}
                     >
-                      AI Reply
+                      Selected Reply
                     </p>
 
                     <textarea
-                      value={replies[email.id]}
+                      value={selectedReply}
                       onChange={(e) =>
-                        setReplies((prev) => ({
+                        setSelectedReplies((prev) => ({
                           ...prev,
                           [email.id]: e.target.value,
                         }))
@@ -645,7 +770,7 @@ export default function DashboardPage() {
                     >
                       <button
                         onClick={() =>
-                          navigator.clipboard.writeText(replies[email.id])
+                          navigator.clipboard.writeText(selectedReply)
                         }
                         style={{
                           padding: "10px 16px",
