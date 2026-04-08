@@ -24,13 +24,42 @@ export async function GET() {
       auth: oauth2Client,
     });
 
-    const res = await gmail.users.messages.list({
+    // 1. Liste des messages
+    const list = await gmail.users.messages.list({
       userId: "me",
       maxResults: 5,
     });
 
+    const messages = list.data.messages || [];
+
+    // 2. Détail de chaque message
+    const detailedMessages = await Promise.all(
+      messages.map(async (msg) => {
+        const full = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id!,
+        });
+
+        const headers = full.data.payload?.headers || [];
+
+        const subject =
+          headers.find((h) => h.name === "Subject")?.value || "";
+
+        const from =
+          headers.find((h) => h.name === "From")?.value || "";
+
+        return {
+          id: msg.id,
+          threadId: msg.threadId,
+          subject,
+          from,
+          snippet: full.data.snippet,
+        };
+      })
+    );
+
     return NextResponse.json({
-      messages: res.data.messages || [],
+      messages: detailedMessages,
     });
   } catch (error: any) {
     return NextResponse.json(
