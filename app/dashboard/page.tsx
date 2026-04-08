@@ -17,6 +17,22 @@ type GmailMessage = {
   suggestedAction: "reply" | "read" | "archive" | "ignore";
 };
 
+type StyleProfile = {
+  tone?: string;
+  formality?: string;
+  averageLength?: string;
+  averageWords?: number;
+  greetingStyle?: string;
+  closingStyle?: string;
+  commonPhrases?: string[];
+  decisionNotes?: {
+    conciseReplies?: boolean;
+    oftenSuggestsNextStep?: boolean;
+    consistentlyPolite?: boolean;
+  };
+  sampleCount?: number;
+};
+
 export default function DashboardPage() {
   const [emails, setEmails] = useState<GmailMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,6 +71,19 @@ export default function DashboardPage() {
       setReplyLoadingId(email.id);
       setError("");
 
+      const styleRes = await fetch("/api/style-profile", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const styleData = await styleRes.json();
+
+      if (!styleRes.ok) {
+        throw new Error(styleData?.error || "Failed to load style profile");
+      }
+
+      const styleProfile: StyleProfile | undefined = styleData?.profile;
+
       const res = await fetch("/api/reply", {
         method: "POST",
         headers: {
@@ -64,6 +93,10 @@ export default function DashboardPage() {
           from: email.from,
           subject: email.subject,
           body: email.body || email.snippet,
+          category: email.category,
+          needsReply: email.needsReply,
+          suggestedAction: email.suggestedAction,
+          styleProfile,
         }),
       });
 
@@ -71,6 +104,14 @@ export default function DashboardPage() {
 
       if (!res.ok) {
         throw new Error(data?.error || "Failed to generate reply");
+      }
+
+      if (data?.skipped) {
+        setReplies((prev) => ({
+          ...prev,
+          [email.id]: data?.reason || "No reply needed.",
+        }));
+        return;
       }
 
       setReplies((prev) => ({
@@ -542,4 +583,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-                        }
+        }
