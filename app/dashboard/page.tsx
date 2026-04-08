@@ -162,9 +162,9 @@ export default function DashboardPage() {
 
   const sendReply = async (email: GmailMessage) => {
     try {
-      const reply = selectedReplies[email.id];
+      const editedReply = selectedReplies[email.id];
 
-      if (!reply || !reply.trim()) {
+      if (!editedReply || !editedReply.trim()) {
         throw new Error("No reply to send");
       }
 
@@ -174,7 +174,13 @@ export default function DashboardPage() {
       const emailMatch = email.from.match(/<(.+?)>/);
       const to = emailMatch ? emailMatch[1] : email.from.trim();
 
-      const res = await fetch("/api/send", {
+      const selectedGeneratedReply =
+        replies[email.id]?.find((reply) => reply.text === selectedReplies[email.id])?.text ||
+        replies[email.id]?.find((reply) => reply.type === "balanced")?.text ||
+        replies[email.id]?.[0]?.text ||
+        "";
+
+      const sendRes = await fetch("/api/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,16 +188,33 @@ export default function DashboardPage() {
         body: JSON.stringify({
           to,
           subject: email.subject,
-          reply: reply.trim(),
+          reply: editedReply.trim(),
           threadId: email.threadId,
         }),
       });
 
-      const data = await res.json();
+      const sendData = await sendRes.json();
 
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to send reply");
+      if (!sendRes.ok) {
+        throw new Error(sendData?.error || "Failed to send reply");
       }
+
+      await fetch("/api/learn", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          originalReply: selectedGeneratedReply || editedReply.trim(),
+          editedReply: editedReply.trim(),
+          emailContext: {
+            from: email.from,
+            subject: email.subject,
+            body: email.body || email.snippet,
+            category: email.category,
+          },
+        }),
+      });
 
       setSentIds((prev) => ({
         ...prev,
@@ -914,4 +937,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-              }
+                  }
