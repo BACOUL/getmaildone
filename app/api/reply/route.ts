@@ -68,6 +68,7 @@ Important:
 - If the user is concise, stay concise
 - If the user is direct, stay direct
 - If the user usually suggests a next step, do it naturally
+- Keep the wording realistic, simple and human
 `;
 }
 
@@ -122,6 +123,23 @@ Content: ${safeBody}
 `.trim();
     })
     .join("\n\n---\n\n");
+}
+
+function buildDecisionInstructions(category?: string, suggestedAction?: string) {
+  return `
+Decision guidance:
+- Category: ${category || "unknown"}
+- Suggested action: ${suggestedAction || "unknown"}
+
+Behavior rules:
+- If the email is a simple question, answer directly in the first sentence
+- If the email is from a buyer or shows commercial interest, be useful and move the conversation forward
+- If a next step makes sense, suggest one naturally
+- If information is missing, ask one short clarifying question instead of guessing
+- Avoid generic filler like "Thank you for your message" unless it feels natural
+- Avoid repeating information already present in the thread
+- Keep the answer practical and specific
+`;
 }
 
 export async function POST(request: NextRequest) {
@@ -194,12 +212,18 @@ export async function POST(request: NextRequest) {
     }
 
     const styleInstructions = buildStyleInstructions(styleProfile);
+    const decisionInstructions = buildDecisionInstructions(
+      category,
+      suggestedAction
+    );
     const threadContext = formatThreadForPrompt(thread);
 
     const prompt = `
 You are helping a user reply to an email.
 
 ${styleInstructions}
+
+${decisionInstructions}
 
 Email metadata:
 - Sender: ${from || "Unknown sender"}
@@ -224,13 +248,12 @@ Reply types:
 Critical rules:
 - Use the thread context to avoid repeating or contradicting previous messages
 - If the user already answered something in the thread, stay consistent with it
+- Make the reply feel like it was written in 10 seconds by a real human
 - Return STRICT JSON only
 - Do not mention AI
 - Do not explain your reasoning
 - Do not repeat the original email
 - Do not sound overly corporate unless the style profile clearly suggests it
-- If the email is a simple question, answer directly
-- If the email suggests commercial interest, keep the answer useful and practical
 - If details are missing, ask one short clarifying question instead of inventing
 
 Expected JSON format:
@@ -251,7 +274,7 @@ Expected JSON format:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.35,
+        temperature: 0.3,
         response_format: { type: "json_object" },
         messages: [
           {
