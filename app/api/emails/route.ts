@@ -45,6 +45,24 @@ function extractBodyFromPayload(payload: any): string {
   return "";
 }
 
+function cleanEmailBody(text: string) {
+  if (!text) return "";
+
+  let cleaned = decodeHtml(text);
+
+  cleaned = cleaned.replace(/<style[\s\S]*?<\/style>/gi, " ");
+  cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, " ");
+  cleaned = cleaned.replace(/<[^>]*>/g, " ");
+  cleaned = cleaned.replace(/https?:\/\/\S+/gi, " ");
+  cleaned = cleaned.replace(/\S+@\S+\.\S+/g, " ");
+  cleaned = cleaned.replace(/&nbsp;/gi, " ");
+  cleaned = cleaned.replace(/\[image:.*?\]/gi, " ");
+  cleaned = cleaned.replace(/\b(?:facebook|instagram|twitter|linkedin|youtube|tiktok)\b/gi, " ");
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+  return cleaned.slice(0, 500);
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -91,7 +109,7 @@ export async function GET() {
           headers.find((h) => h.name === "From")?.value || "";
 
         const rawBody = extractBodyFromPayload(full.data.payload);
-        const cleanedBody = decodeHtml(rawBody).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        const cleanedBody = cleanEmailBody(rawBody);
 
         return {
           id: msg.id,
