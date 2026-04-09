@@ -10,14 +10,22 @@ type EmailCategory =
   | "ignore";
 
 type SuggestedAction = "reply" | "read" | "archive" | "ignore";
+type PriorityLabel = "high" | "medium" | "low";
+type IntentLevel = "high" | "medium" | "low";
+type ReplyRisk = "high" | "medium" | "low";
 
 type ClassificationResult = {
   category: EmailCategory;
   needsReply: boolean;
   priorityScore: number;
+  priorityLabel: PriorityLabel;
   confidence: number;
   reason: string;
   suggestedAction: SuggestedAction;
+  humanLike: boolean;
+  humanScore: number;
+  intentLevel: IntentLevel;
+  replyRisk: ReplyRisk;
 };
 
 function decodeHtml(value: string) {
@@ -82,6 +90,16 @@ function cleanEmailBody(text: string) {
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
   return cleaned.slice(0, 1200);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getPriorityLabel(priorityScore: number): PriorityLabel {
+  if (priorityScore >= 75) return "high";
+  if (priorityScore >= 40) return "medium";
+  return "low";
 }
 
 function isHumanLikeEmail(
@@ -174,6 +192,118 @@ function isHumanLikeEmail(
   return {
     isHuman: score > 0,
     score,
+  };
+}
+
+function detectIntentLevel(
+  from: string,
+  subject: string,
+  body: string,
+  snippet: string
+): IntentLevel {
+  const text = `${from} ${subject} ${body} ${snippet}`.toLowerCase();
+
+  const highIntentSignals = [
+    "toujours disponible",
+    "still available",
+    "je suis intéressé",
+    "je suis interesse",
+    "i am interested",
+    "prix",
+    "price",
+    "quand",
+    "when",
+    "rendez-vous",
+    "meeting",
+    "je peux passer",
+    "can i come",
+    "vendredi",
+    "samedi",
+    "demain",
+    "available",
+    "disponible",
+    "call me",
+    "appelez-moi",
+    "pickup",
+    "leboncoin",
+    "marketplace",
+    "?",
+  ];
+
+  const mediumIntentSignals = [
+    "merci",
+    "bonjour",
+    "hello",
+    "hi ",
+    "confirm",
+    "confirmé",
+    "reservation",
+    "appointment",
+    "follow up",
+    "follow-up",
+    "relance",
+  ];
+
+  const highHits = highIntentSignals.filter((s) => text.includes(s)).length;
+  const mediumHits = mediumIntentSignals.filter((s) => text.includes(s)).length;
+
+  if (highHits >= 2) return "high";
+  if (highHits >= 1 || mediumHits >= 2) return "medium";
+  return "low";
+}
+
+function deriveReplyRisk(
+  category: EmailCategory,
+  needsReply: boolean,
+  intentLevel: IntentLevel,
+  priorityScore: number
+): ReplyRisk {
+  if (needsReply && (intentLevel === "high" || priorityScore >= 75)) {
+    return "high";
+  }
+
+  if (
+    needsReply ||
+    category === "important_info" ||
+    intentLevel === "medium" ||
+    priorityScore >= 40
+  ) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function buildClassificationResult(input: {
+  category: EmailCategory;
+  needsReply: boolean;
+  priorityScore: number;
+  confidence: number;
+  reason: string;
+  suggestedAction: SuggestedAction;
+  humanLike: boolean;
+  humanScore: number;
+  intentLevel: IntentLevel;
+}): ClassificationResult {
+  const priorityScore = clamp(input.priorityScore, 0, 100);
+
+  return {
+    category: input.category,
+    needsReply: input.needsReply,
+    priorityScore,
+    priorityLabel: getPriorityLabel(priorityScore),
+    confidence: clamp(input.confidence, 0, 1),
+    reason: input.reason,
+    suggestedAction: input.suggestedAction,
+    humanLike: input.humanLike,
+    humanScore: input.humanScore,
+    intentLevel: input.intentLevel,
+    replyRisk: deriveReplyRisk(
+      input.category,
+      input.needsReply,
+      input.intentLevel,
+      priorityScore
+    ),
   };
 }
 
@@ -299,6 +429,7 @@ function heuristicClassifyEmail(
   );
 
   const humanCheck = isHumanLikeEmail(from, subject, body, snippet);
+  const intentLevel = detectIntentLevel(from, subject, body, snippet);
 
   if (hasReplySignal) priorityScore += 60;
   if (hasImportantInfo) priorityScore += 35;
@@ -307,85 +438,108 @@ function heuristicClassifyEmail(
   if (hasNoReply) priorityScore -= 40;
   if (humanCheck.isHuman) priorityScore += 15;
   if (!humanCheck.isHuman) priorityScore -= 30;
+  if (intentLevel === "high") priorityScore += 15;
+  if (intentLevel === "medium") priorityScore += 5;
 
   if (!humanCheck.isHuman && !hasReplySignal && !hasImportantInfo) {
-    return {
+    return buildClassificationResult({
       category: "ignore",
       needsReply: false,
-      priorityScore: Math.max(priorityScore, 0),
+      priorityScore,
       confidence: 0.82,
       reason: "Detected as automated or low human-intent email",
       suggestedAction: "ignore",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
   if (hasPromotional && !hasReplySignal) {
-    return {
+    return buildClassificationResult({
       category: "promotional",
       needsReply: false,
-      priorityScore: Math.max(priorityScore, 0),
+      priorityScore,
       confidence: 0.72,
       reason: "Promotional or newsletter-like email detected",
       suggestedAction: "ignore",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
   if (hasNoReply && !hasReplySignal) {
-    return {
+    return buildClassificationResult({
       category: "ignore",
       needsReply: false,
-      priorityScore: Math.max(priorityScore, 0),
+      priorityScore,
       confidence: 0.8,
       reason: "No-reply or system notification detected",
       suggestedAction: "ignore",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
   if (hasReplySignal) {
-    return {
+    return buildClassificationResult({
       category: "reply_needed",
       needsReply: true,
-      priorityScore: Math.min(priorityScore, 100),
+      priorityScore,
       confidence: humanCheck.isHuman ? 0.8 : 0.74,
       reason: humanCheck.isHuman
         ? "Human-like message with direct reply intent detected"
         : "Direct question or explicit reply intent detected",
       suggestedAction: "reply",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
   if (hasTransactional) {
-    return {
+    return buildClassificationResult({
       category: "transactional",
       needsReply: false,
-      priorityScore: Math.min(priorityScore, 100),
+      priorityScore,
       confidence: 0.76,
       reason: "Transactional email detected",
       suggestedAction: "archive",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
   if (hasImportantInfo) {
-    return {
+    return buildClassificationResult({
       category: "important_info",
       needsReply: false,
-      priorityScore: Math.min(priorityScore, 100),
+      priorityScore,
       confidence: 0.68,
       reason: "Important informational email detected",
       suggestedAction: "read",
-    };
+      humanLike: humanCheck.isHuman,
+      humanScore: humanCheck.score,
+      intentLevel,
+    });
   }
 
-  return {
+  return buildClassificationResult({
     category: "ignore",
     needsReply: false,
-    priorityScore: Math.max(priorityScore, 0),
+    priorityScore,
     confidence: 0.55,
     reason: humanCheck.isHuman
       ? "Human-like email but no clear reply intent detected"
       : "No clear reply intent detected",
     suggestedAction: "ignore",
-  };
+    humanLike: humanCheck.isHuman,
+    humanScore: humanCheck.score,
+    intentLevel,
+  });
 }
 
 async function aiClassifyEmail(input: {
@@ -411,7 +565,10 @@ Return STRICT JSON only with this exact shape:
   "priorityScore": number,
   "confidence": number,
   "reason": string,
-  "suggestedAction": "reply" | "read" | "archive" | "ignore"
+  "suggestedAction": "reply" | "read" | "archive" | "ignore",
+  "humanLike": boolean,
+  "humanScore": number,
+  "intentLevel": "high" | "medium" | "low"
 }
 
 Rules:
@@ -421,9 +578,11 @@ Rules:
 - promotional = newsletter, marketing, commercial campaign
 - ignore = low-value system noise or irrelevant message
 - give extra attention to whether this looks like a real human message or not
+- intentLevel = estimate the practical intent level of the sender
 
 Priority score must be between 0 and 100.
 Confidence must be between 0 and 1.
+humanScore can be any reasonable signed integer score.
 
 Heuristic result:
 ${JSON.stringify(input.heuristic)}
@@ -489,24 +648,27 @@ Body: ${input.body.slice(0, 1500)}
       "ignore",
     ];
 
+    const validIntentLevels: IntentLevel[] = ["high", "medium", "low"];
+
     if (
       !validCategories.includes(parsed.category) ||
-      !validActions.includes(parsed.suggestedAction)
+      !validActions.includes(parsed.suggestedAction) ||
+      !validIntentLevels.includes(parsed.intentLevel)
     ) {
       return null;
     }
 
-    return {
+    return buildClassificationResult({
       category: parsed.category,
       needsReply: Boolean(parsed.needsReply),
-      priorityScore: Math.max(
-        0,
-        Math.min(100, Number(parsed.priorityScore) || 0)
-      ),
-      confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
+      priorityScore: Number(parsed.priorityScore) || 0,
+      confidence: Number(parsed.confidence) || 0,
       reason: String(parsed.reason || "AI classification"),
       suggestedAction: parsed.suggestedAction,
-    };
+      humanLike: Boolean(parsed.humanLike),
+      humanScore: Number(parsed.humanScore) || 0,
+      intentLevel: parsed.intentLevel,
+    });
   } catch {
     return null;
   }
@@ -608,9 +770,14 @@ export async function GET() {
           category: classification.category,
           needsReply: classification.needsReply,
           priorityScore: classification.priorityScore,
+          priorityLabel: classification.priorityLabel,
           confidence: classification.confidence,
           reason: classification.reason,
           suggestedAction: classification.suggestedAction,
+          humanLike: classification.humanLike,
+          humanScore: classification.humanScore,
+          intentLevel: classification.intentLevel,
+          replyRisk: classification.replyRisk,
         };
       })
     );
@@ -628,4 +795,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-  }
+      }
