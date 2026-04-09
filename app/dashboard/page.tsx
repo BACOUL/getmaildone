@@ -45,10 +45,17 @@ type ReplyVariant = {
 
 type FilterMode = "reply" | "all";
 
+type ReplyMeta = {
+  threadUsed?: boolean;
+  threadMessageCount?: number;
+  learningExamplesUsed?: number;
+};
+
 export default function DashboardPage() {
   const [emails, setEmails] = useState<GmailMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
 
   const [filter, setFilter] = useState<FilterMode>("reply");
 
@@ -56,6 +63,7 @@ export default function DashboardPage() {
   const [selectedReplies, setSelectedReplies] = useState<Record<string, string>>(
     {}
   );
+  const [replyMeta, setReplyMeta] = useState<Record<string, ReplyMeta>>({});
   const [replyLoadingId, setReplyLoadingId] = useState<string | null>(null);
   const [sendLoadingId, setSendLoadingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Record<string, boolean>>({});
@@ -64,6 +72,7 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError("");
+      setSuccess("");
 
       const res = await fetch("/api/emails", {
         method: "GET",
@@ -89,6 +98,7 @@ export default function DashboardPage() {
     try {
       setReplyLoadingId(email.id);
       setError("");
+      setSuccess("");
 
       const styleRes = await fetch("/api/style-profile", {
         method: "GET",
@@ -135,6 +145,10 @@ export default function DashboardPage() {
           ...prev,
           [email.id]: data?.reason || "No reply needed.",
         }));
+        setReplyMeta((prev) => ({
+          ...prev,
+          [email.id]: {},
+        }));
         return;
       }
 
@@ -153,6 +167,15 @@ export default function DashboardPage() {
         ...prev,
         [email.id]: balanced?.text || "",
       }));
+
+      setReplyMeta((prev) => ({
+        ...prev,
+        [email.id]: {
+          threadUsed: Boolean(data?.threadUsed),
+          threadMessageCount: Number(data?.threadMessageCount || 0),
+          learningExamplesUsed: Number(data?.learningExamplesUsed || 0),
+        },
+      }));
     } catch (err: any) {
       setError(err?.message || "Failed to generate replies");
     } finally {
@@ -170,12 +193,15 @@ export default function DashboardPage() {
 
       setSendLoadingId(email.id);
       setError("");
+      setSuccess("");
 
       const emailMatch = email.from.match(/<(.+?)>/);
       const to = emailMatch ? emailMatch[1] : email.from.trim();
 
       const selectedGeneratedReply =
-        replies[email.id]?.find((reply) => reply.text === selectedReplies[email.id])?.text ||
+        replies[email.id]?.find(
+          (reply) => reply.text === selectedReplies[email.id]
+        )?.text ||
         replies[email.id]?.find((reply) => reply.type === "balanced")?.text ||
         replies[email.id]?.[0]?.text ||
         "";
@@ -220,6 +246,8 @@ export default function DashboardPage() {
         ...prev,
         [email.id]: true,
       }));
+
+      setSuccess("Reply sent and learning example saved.");
     } catch (err: any) {
       setError(err?.message || "Failed to send reply");
     } finally {
@@ -451,6 +479,22 @@ export default function DashboardPage() {
           </div>
         ) : null}
 
+        {success ? (
+          <div
+            style={{
+              marginTop: "20px",
+              padding: "14px 16px",
+              borderRadius: "12px",
+              background: "#dcfce7",
+              color: "#166534",
+              border: "1px solid #86efac",
+              wordBreak: "break-word",
+            }}
+          >
+            {success}
+          </div>
+        ) : null}
+
         <div
           style={{
             marginTop: "28px",
@@ -481,6 +525,7 @@ export default function DashboardPage() {
             const selectedReply = selectedReplies[email.id] || "";
             const hasReply = Boolean(selectedReply);
             const isSent = Boolean(sentIds[email.id]);
+            const meta = replyMeta[email.id];
 
             return (
               <article
@@ -646,6 +691,23 @@ export default function DashboardPage() {
                   >
                     <strong>Suggested action:</strong> {email.suggestedAction}
                   </p>
+                  {meta ? (
+                    <p
+                      style={{
+                        marginTop: "6px",
+                        marginBottom: 0,
+                        fontSize: "13px",
+                        lineHeight: 1.6,
+                        color: "#334155",
+                      }}
+                    >
+                      <strong>Generation context:</strong>{" "}
+                      {meta.threadUsed
+                        ? `thread used (${meta.threadMessageCount || 0} messages)`
+                        : "no thread"}{" "}
+                      • learning examples used: {meta.learningExamplesUsed || 0}
+                    </p>
+                  ) : null}
                 </div>
 
                 {email.body ? (
@@ -711,6 +773,8 @@ export default function DashboardPage() {
                   >
                     {replyLoadingId === email.id
                       ? "Generating..."
+                      : emailReplies.length > 0
+                      ? "Regenerate replies"
                       : "Generate replies"}
                   </button>
                 ) : null}
@@ -937,4 +1001,4 @@ export default function DashboardPage() {
       </div>
     </main>
   );
-                  }
+                }
