@@ -91,7 +91,7 @@ Important:
 `;
 }
 
-function normalizeReplies(raw: any): ReplyVariant[] {
+function normalizeReplies(raw: unknown): ReplyVariant[] {
   if (!Array.isArray(raw)) return [];
 
   const validTypes: Array<ReplyVariant["type"]> = [
@@ -102,12 +102,15 @@ function normalizeReplies(raw: any): ReplyVariant[] {
 
   const cleaned = raw
     .map((item) => {
-      const type = validTypes.includes(item?.type) ? item.type : null;
-      const text = typeof item?.text === "string" ? item.text.trim() : "";
+      const type = validTypes.includes((item as any)?.type)
+        ? ((item as any).type as ReplyVariant["type"])
+        : null;
+      const text =
+        typeof (item as any)?.text === "string" ? (item as any).text.trim() : "";
 
       if (!type || !text) return null;
 
-      return { type, text } as ReplyVariant;
+      return { type, text } satisfies ReplyVariant;
     })
     .filter(Boolean) as ReplyVariant[];
 
@@ -210,7 +213,6 @@ function detectScenario(subject: string, body: string, thread: ThreadMessage[]) 
     "achat",
     "vendre",
     "pickup",
-    "pickup",
     "cash",
     "combien",
   ];
@@ -295,6 +297,61 @@ General rules:
   }
 }
 
+async function loadThread(
+  appUrl: string,
+  cookieHeader: string,
+  threadId?: string
+): Promise<ThreadMessage[]> {
+  if (!threadId) return [];
+
+  try {
+    const threadResponse = await fetch(`${appUrl}/api/thread`, {
+      method: "POST",
+      headers: {
+        Cookie: cookieHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ threadId }),
+      cache: "no-store",
+    });
+
+    const threadData = await threadResponse.json();
+
+    if (threadResponse.ok && Array.isArray(threadData?.thread)) {
+      return threadData.thread;
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+async function loadLearningExamples(
+  appUrl: string,
+  cookieHeader: string
+): Promise<LearningExample[]> {
+  try {
+    const learnResponse = await fetch(`${appUrl}/api/learn`, {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+      },
+      cache: "no-store",
+    });
+
+    const learnData = await learnResponse.json();
+
+    if (learnResponse.ok && Array.isArray(learnData?.examples)) {
+      return learnData.examples;
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -340,48 +397,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let thread: ThreadMessage[] = [];
-    let learningExamples: LearningExample[] = [];
+    const cookieHeader = request.headers.get("cookie") || "";
 
-    if (threadId) {
-      try {
-        const threadResponse = await fetch(`${appUrl}/api/thread`, {
-          method: "POST",
-          headers: {
-            Cookie: request.headers.get("cookie") || "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ threadId }),
-          cache: "no-store",
-        });
-
-        const threadData = await threadResponse.json();
-
-        if (threadResponse.ok && Array.isArray(threadData?.thread)) {
-          thread = threadData.thread;
-        }
-      } catch {
-        thread = [];
-      }
-    }
-
-    try {
-      const learnResponse = await fetch(`${appUrl}/api/learn`, {
-        method: "GET",
-        headers: {
-          Cookie: request.headers.get("cookie") || "",
-        },
-        cache: "no-store",
-      });
-
-      const learnData = await learnResponse.json();
-
-      if (learnResponse.ok && Array.isArray(learnData?.examples)) {
-        learningExamples = learnData.examples;
-      }
-    } catch {
-      learningExamples = [];
-    }
+    const [thread, learningExamples] = await Promise.all([
+      loadThread(appUrl, cookieHeader, threadId),
+      loadLearningExamples(appUrl, cookieHeader),
+    ]);
 
     const styleInstructions = buildStyleInstructions(styleProfile);
     const decisionInstructions = buildDecisionInstructions(
