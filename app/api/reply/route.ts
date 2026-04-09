@@ -49,6 +49,8 @@ function buildStyleInstructions(styleProfile?: StyleProfile) {
     return `
 No strong personal style profile is available yet.
 Write like a natural human: short, clear, polite, practical.
+Prefer simple and direct sentences.
+Avoid formal letter language unless clearly needed.
 `;
   }
 
@@ -82,6 +84,10 @@ Important:
 - If the user is direct, stay direct
 - If the user usually suggests a next step, do it naturally
 - Keep the wording realistic, simple and human
+- Prefer simple, direct sentences
+- Avoid long formal email structures unless clearly appropriate
+- Avoid "Bonjour, merci pour votre message" unless it feels natural
+- Write like a quick real message, not a stiff formal letter
 `;
 }
 
@@ -152,6 +158,10 @@ Behavior rules:
 - Avoid generic filler like "Thank you for your message" unless it feels natural
 - Avoid repeating information already present in the thread
 - Keep the answer practical and specific
+- Prioritize usefulness over politeness
+- If negotiation or buying is involved, be practical
+- If a meeting or pickup is possible, propose a clear next step
+- If the sender asks multiple things, answer the most important one first
 `;
 }
 
@@ -180,6 +190,109 @@ ${example.editedReply || ""}
 `.trim();
     })
     .join("\n\n---\n\n");
+}
+
+function detectScenario(subject: string, body: string, thread: ThreadMessage[]) {
+  const text = `${subject} ${body} ${thread
+    .map((m) => `${m.subject} ${m.body} ${m.snippet}`)
+    .join(" ")}`.toLowerCase();
+
+  const marketplaceSignals = [
+    "leboncoin",
+    "marketplace",
+    "disponible",
+    "prix",
+    "vendredi",
+    "samedi",
+    "passer",
+    "venir",
+    "voir",
+    "achat",
+    "vendre",
+    "pickup",
+    "pickup",
+    "cash",
+    "combien",
+  ];
+
+  const appointmentSignals = [
+    "rendez-vous",
+    "meeting",
+    "appointment",
+    "créneau",
+    "horaire",
+    "heure",
+    "disponible",
+    "vendredi",
+    "demain",
+  ];
+
+  const supportSignals = [
+    "support",
+    "problem",
+    "issue",
+    "bug",
+    "help",
+    "aide",
+    "problème",
+    "erreur",
+  ];
+
+  const hasMarketplace = marketplaceSignals.some((s) => text.includes(s));
+  const hasAppointment = appointmentSignals.some((s) => text.includes(s));
+  const hasSupport = supportSignals.some((s) => text.includes(s));
+
+  if (hasMarketplace) return "marketplace";
+  if (hasSupport) return "support";
+  if (hasAppointment) return "appointment";
+  return "general";
+}
+
+function buildScenarioInstructions(scenario: string) {
+  switch (scenario) {
+    case "marketplace":
+      return `
+Scenario: marketplace / buyer-seller conversation
+
+Marketplace rules:
+- Be concrete and efficient
+- Prefer proposing a clear next step
+- If availability is known, reuse it
+- If date or time is being discussed, anchor the reply around that
+- Do not sound corporate
+- Do not over-explain
+- If price, pickup, condition or availability matters, address it directly
+`;
+    case "appointment":
+      return `
+Scenario: appointment / scheduling conversation
+
+Scheduling rules:
+- Confirm availability clearly
+- Offer one or two concrete options when possible
+- Ask for the exact time only if needed
+- Keep it practical and light
+`;
+    case "support":
+      return `
+Scenario: support / issue conversation
+
+Support rules:
+- Acknowledge the issue briefly
+- Focus on the next useful step
+- Ask only one clarifying question if needed
+- Stay calm and practical
+`;
+    default:
+      return `
+Scenario: general conversation
+
+General rules:
+- Reply naturally
+- Move the conversation forward
+- Keep the message useful and specific
+`;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -277,6 +390,8 @@ export async function POST(request: NextRequest) {
     );
     const threadContext = formatThreadForPrompt(thread);
     const learningContext = formatLearningExamples(learningExamples);
+    const scenario = detectScenario(subject, body, thread);
+    const scenarioInstructions = buildScenarioInstructions(scenario);
 
     const prompt = `
 You are helping a user reply to an email.
@@ -284,6 +399,8 @@ You are helping a user reply to an email.
 ${styleInstructions}
 
 ${decisionInstructions}
+
+${scenarioInstructions}
 
 Past user correction examples:
 ${learningContext}
@@ -293,6 +410,7 @@ Email metadata:
 - Subject: ${subject}
 - Category: ${category || "unknown"}
 - Suggested action: ${suggestedAction || "unknown"}
+- Scenario: ${scenario}
 
 Current email body:
 ${body}
@@ -302,6 +420,13 @@ ${threadContext}
 
 Your task:
 Generate 3 realistic reply options that the user could actually send.
+
+Before writing, understand:
+- What does the sender want?
+- What is the user's likely objective?
+- What is the most useful next step?
+- What information is already known in the thread?
+- What information is still missing?
 
 Reply types:
 1. short = very concise, direct
@@ -316,12 +441,16 @@ Critical rules:
   - avoid patterns the user tends to rewrite
   - reuse the user's natural style when appropriate
 - Make the reply feel like it was written in 10 seconds by a real human
+- Prioritize usefulness over politeness
+- Do not give vague generic replies
+- If a concrete next step is possible, include it
+- If details are missing, ask one short precise question instead of inventing
+- Keep replies believable and actionable
 - Return STRICT JSON only
 - Do not mention AI
 - Do not explain your reasoning
 - Do not repeat the original email
 - Do not sound overly corporate unless the style profile clearly suggests it
-- If details are missing, ask one short clarifying question instead of inventing
 
 Expected JSON format:
 {
@@ -341,13 +470,13 @@ Expected JSON format:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.25,
+        temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              "You write realistic email replies in the user's personal style. Use prior user corrections when available. Return only valid JSON.",
+              "You write realistic, useful email replies in the user's personal style. Use prior user corrections when available. Return only valid JSON.",
           },
           {
             role: "user",
@@ -400,6 +529,7 @@ Expected JSON format:
       threadUsed: thread.length > 0,
       threadMessageCount: thread.length,
       learningExamplesUsed: learningExamples.slice(0, 5).length,
+      scenario,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -407,4 +537,4 @@ Expected JSON format:
       { status: 500 }
     );
   }
-}
+      }
