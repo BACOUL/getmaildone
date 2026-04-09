@@ -31,6 +31,19 @@ type ThreadMessage = {
   body: string;
 };
 
+type LearningExample = {
+  id: string;
+  originalReply: string;
+  editedReply: string;
+  emailContext?: {
+    from?: string;
+    subject?: string;
+    body?: string;
+    category?: string;
+  };
+  createdAt?: string;
+};
+
 function buildStyleInstructions(styleProfile?: StyleProfile) {
   if (!styleProfile) {
     return `
@@ -142,6 +155,33 @@ Behavior rules:
 `;
 }
 
+function formatLearningExamples(examples: LearningExample[]) {
+  if (!examples.length) {
+    return "No user correction examples available yet.";
+  }
+
+  return examples
+    .slice(0, 5)
+    .map((example, index) => {
+      const ctx = example.emailContext || {};
+
+      return `
+Example ${index + 1}
+Context:
+- From: ${ctx.from || "Unknown sender"}
+- Subject: ${ctx.subject || "(No subject)"}
+- Category: ${ctx.category || "unknown"}
+
+AI original reply:
+${example.originalReply || ""}
+
+User final edited reply:
+${example.editedReply || ""}
+`.trim();
+    })
+    .join("\n\n---\n\n");
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -188,6 +228,7 @@ export async function POST(request: NextRequest) {
     }
 
     let thread: ThreadMessage[] = [];
+    let learningExamples: LearningExample[] = [];
 
     if (threadId) {
       try {
@@ -211,12 +252,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    try {
+      const learnResponse = await fetch(`${appUrl}/api/learn`, {
+        method: "GET",
+        headers: {
+          Cookie: request.headers.get("cookie") || "",
+        },
+        cache: "no-store",
+      });
+
+      const learnData = await learnResponse.json();
+
+      if (learnResponse.ok && Array.isArray(learnData?.examples)) {
+        learningExamples = learnData.examples;
+      }
+    } catch {
+      learningExamples = [];
+    }
+
     const styleInstructions = buildStyleInstructions(styleProfile);
     const decisionInstructions = buildDecisionInstructions(
       category,
       suggestedAction
     );
     const threadContext = formatThreadForPrompt(thread);
+    const learningContext = formatLearningExamples(learningExamples);
 
     const prompt = `
 You are helping a user reply to an email.
@@ -224,6 +284,9 @@ You are helping a user reply to an email.
 ${styleInstructions}
 
 ${decisionInstructions}
+
+Past user correction examples:
+${learningContext}
 
 Email metadata:
 - Sender: ${from || "Unknown sender"}
@@ -248,6 +311,10 @@ Reply types:
 Critical rules:
 - Use the thread context to avoid repeating or contradicting previous messages
 - If the user already answered something in the thread, stay consistent with it
+- Learn from the correction examples:
+  - move closer to the user's edited replies
+  - avoid patterns the user tends to rewrite
+  - reuse the user's natural style when appropriate
 - Make the reply feel like it was written in 10 seconds by a real human
 - Return STRICT JSON only
 - Do not mention AI
@@ -274,13 +341,13 @@ Expected JSON format:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.3,
+        temperature: 0.25,
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              "You write realistic email replies in the user's personal style. Return only valid JSON.",
+              "You write realistic email replies in the user's personal style. Use prior user corrections when available. Return only valid JSON.",
           },
           {
             role: "user",
@@ -332,6 +399,7 @@ Expected JSON format:
       replies,
       threadUsed: thread.length > 0,
       threadMessageCount: thread.length,
+      learningExamplesUsed: learningExamples.slice(0, 5).length,
     });
   } catch (error: any) {
     return NextResponse.json(
